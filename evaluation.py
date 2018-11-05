@@ -6,11 +6,12 @@ import time
 import copy
 np.random.seed(1)
 
-from steven import init
-from steven import gradientgrow
-from steven import lime
-from steven import localsurrogate
-from steven import analysis
+import init
+import gradientgrow
+import analysis
+import lime
+import localsurrogate
+
 
 
 def finalEvaluation(jobs = 103):
@@ -183,6 +184,7 @@ def finalEvaluation(jobs = 103):
     print("Es wurden insgesamt ", str(len(dt_lime)), " viele Instanzen evaluiert.")
     return True
 
-
+if __name__ == '__main__':
+    finalEvaluation()
 
 print("\nImplementierung wurde erfolgreich gestartet. Die Methode\n--> finalEvaluation()\nkann nun ausgeführt werden.")
