@@ -23,6 +23,7 @@ def finalEvaluation(jobs=103):
     clf = RandomForestClassifier(n_jobs=100, n_estimators=50, random_state=5000)
     clf.fit(X_train, Y_train)
 
+
     # --- Accuracy
     print("Accuracy:", accuracy_score(Y_test, clf.predict(X_test)))
     print("Report:\n", classification_report(Y_test, clf.predict(X_test)))
@@ -64,7 +65,9 @@ def finalEvaluation(jobs=103):
         print("################")
         np.random.seed(1)
 
-        sample = []
+        positive_found = False
+        # TODO: Evaluate difference to previous version in detail!
+        # CHECK Git Log
         for j in range(0, 100):
             coord1 = np.random.uniform(min1, max1)
             coord2 = np.random.uniform(min2, max2)
@@ -72,10 +75,11 @@ def finalEvaluation(jobs=103):
             dummy[attr1] = coord1
             dummy[attr2] = coord2
             coord3 = np.array(clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
-            coord3 = int(coord3 >= 0.5)
-            sample.append(coord3)
+            if coord3 >= 0.5:
+                positive_found = True
+                break
 
-        if (np.sum(sample) > 0):
+        if (positive_found):
             # +--------------+
             # | GradientGrow |
             # +--------------+
