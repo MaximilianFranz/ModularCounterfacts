@@ -12,12 +12,30 @@ class decision:
         self.instance = list(instance)
         self.clf = clf
         self.dataset = np.array(dataset)
+        self.GSP = []
+        self.last_instance = instance
+        self.walk_step = []
 
         self.attr_range = []
         self.difference = []
+
+        # Define the value ranges for the chosen attributes
+        # Store difference between upper and lower boundaries - NOT USED
         for item in self.chosen_attr:
-            self.attr_range.append([min(self.dataset[:,item]), max(self.dataset[:,item])])
-            self.difference.append((max(self.dataset[:,item]) - min(self.dataset[:,item]))*0.2)
+            self.attr_range.append([min(self.dataset[:,item]),
+                                    max(self.dataset[:,item])])
+            self.difference.append((max(self.dataset[:,item])
+                                    - min(self.dataset[:,item]))*0.2)
+
+    def get_last_instance(self):
+        """
+        Returns complete instance with the modification of the last
+        element in GSP
+        """
+        dummy = np.array(self.instance)
+        dummy[self.chosen_attr] = self.last_instance[1:3]
+        return dummy
+
 
 
     ###########################################################################
@@ -94,34 +112,37 @@ class decision:
 
 
         #--- Find Decision Border
-        self.GSP = []
-        self.walk_step = []
+
         for item in self.attr_range:
             self.walk_step.append((item[1] - item[0])*step)
 
-        #decision_list = [[1,0],[-1,0],[0,1],[0,-1]]
+        # Define decision points as intervals on the unit circle in spherical coords
         decision_list = [0, 0.5*np.pi, np.pi, 1.5*np.pi]
         possible_decisions = list(range(0, len(decision_list)))
 
+        # set counter and check variable, which indicates whether a
+        # positive example has been found
         count = 0
+        check = 0
+        # add the original instance to the Search path with its probability
         last_prediction = np.array(self.clf.predict_proba(np.array(self.instance).reshape(1, -1))[0])[1]
-        self.GSP.append([count, self.instance[self.chosen_attr[0]], self.instance[self.chosen_attr[1]], last_prediction])
+        self.GSP.append([count,
+                        self.instance[self.chosen_attr[0]],
+                        self.instance[self.chosen_attr[1]],
+                        last_prediction])
         print(self.GSP[count])
 
-        check = 0
         while check == 0:
             possible_cands = []
             angle = np.random.uniform(-0.25*np.pi, 0.25*np.pi)
             for i in possible_decisions:
-                #coord1 = self.GSP[count][1] + decision_list[i][0] * self.walk_step[0]
-                #coord2 = self.GSP[count][2] + decision_list[i][1] * self.walk_step[1]
+                # Evaluate all possible decisions
                 coord1 = self.GSP[count][1] + np.cos(decision_list[i] + angle) * self.walk_step[0]
                 coord2 = self.GSP[count][2] + np.sin(decision_list[i] + angle) * self.walk_step[1]
 
-                dummy = list(self.instance)
-                dummy[self.chosen_attr[0]] = coord1
-                dummy[self.chosen_attr[1]] = coord2
-                coord3 = np.array(self.clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
+                dummy = np.array(self.instance)
+                dummy[self.chosen_attr] = [coord1, coord2]
+                coord3 = np.array(self.clf.predict_proba(dummy.reshape(1, -1))[0])[1]
 
                 possible_cands.append([i, coord1, coord2, coord3])
 
@@ -133,20 +154,23 @@ class decision:
                         | (possible_cands[size-i-1][2] > self.attr_range[1][1])):
                     possible_cands.pop(size-i-1)
 
-            x = np.array(possible_cands)[np.array(possible_cands)[:,3] == max(np.array(possible_cands)[:,3])]
-            possible_cands = [list(x[i]) for i in range(0,len(x))]
-            choice = possible_cands[np.random.choice(range(0, len(possible_cands)))]#???
-            #print("?", choice)
+            possible_cands = np.array(possible_cands)[np.array(possible_cands)[:,3] == max(np.array(possible_cands)[:,3])]
+
+            # If multiple candidates meet the maximum criteria, choose randomly
+            choice = possible_cands[np.random.choice(range(len(possible_cands)))]#???
+
             if choice[3] <= last_prediction:
+                # If no better choice found, use search_far
                 choice = search_far(element=self.GSP[count], last_pred=last_prediction, scale=scale)
 
-            possible_decisions = list(range(0, len(decision_list)))
+            possible_decisions = list(range(len(decision_list)))
             possible_decisions.remove(choice[0])
             count = count + 1
             choice[0] = count
             self.GSP.append(choice)
             print('Choice: ', choice)
             check = check + (choice[3] > 0.5)
+            self.last_instance = choice
             last_prediction = choice[3]
 
 
