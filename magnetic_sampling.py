@@ -121,8 +121,15 @@ def sample_in(num_samples, radius_inner, radius_outer, alphas_lower, alphas_uppe
 def get_num_errors(samples, predictor_fn):
     """ Get number of 'wrong' predictions in a set of predictions
     """
-    pred = predictor_fn(samples)
-    return pred[np.where(pred < 0.5)].size
+
+    # TODO: use multi-sample batch mode of predictor_fn!
+
+    num = 0
+    for sample in samples:
+        if predictor_fn(sample.reshape(1,-1))[0,1] < 0.5:
+            num = num + 1
+
+    return num
 
 def create_ranges(start, stop, num, endpoint=True):
     """
@@ -142,81 +149,6 @@ def create_ranges(start, stop, num, endpoint=True):
         divisor = num
     steps = (1.0/divisor) * (stop - start)
     return steps[:,np.newaxis]*np.arange(num) + start[:,np.newaxis]
-
-def magnetic_sampling(predictor_fn,
-                    original_instance,
-                    adversarial_instance,
-                    num_samples,
-                    sector_depth=0.6, #must be set depending on the dataset
-                    sector_width=0.35, #About 20 degree,
-                    confidence=10, #must be set depending on the dataset
-                    threshold= 3 #must be set depending on confidence (e.g. 30 %)
-                    ):
-    """
-    Args:
-        predictor_fn: black-box model that maps to the interval [0,1]
-        original_instance: cartesian coordinates of original instance
-        adversarial_instance: cartesian coordinates of adversarial instance
-        num_samples: Number of samples to be drawn
-        sector_depth: radius of the spherical layer (outer minus inner)
-        sector_width: angle in radians, applied to all dimensions
-        confidence: Number of samples drawn in each sector
-        threshold: number of errors tolerated per sector
-
-
-    """
-    expand_right = True
-    expand_left = True
-
-    # Prep parameters
-    distance = np.linalg.norm(adversarial_instance - original_instance)
-    radius_inner = distance - sector_depth / 2
-    radius_outer = distance + sector_depth / 2
-    alphas = np.array([inverse_coordinate_transform(adversarial_instance - original_instance)[1:]])
-    alphas_lower = alphas - sector_width
-    alphas_upper = alphas + sector_width
-
-    # start original sample
-    total_samples = np.zeros((1, original_instance.size))
-
-    while expand_left or expand_right:
-        if expand_left:
-            sampled_lower = sample_grid(confidence, radius_inner, radius_outer,
-            alphas_lower, alphas_lower + sector_width, original_instance)
-            if get_num_errors(sampled_lower, predictor_fn) > threshold:
-                expand_left = False
-            else:
-                alphas_lower = alphas_lower - sector_width
-                total_samples = np.append(total_samples, sampled_lower, axis=0)
-        if expand_right:
-            sampled_upper = sample_grid(confidence, radius_inner, radius_outer,
-            alphas_upper - sector_width, alphas_upper, original_instance)
-            if get_num_errors(sampled_upper, predictor_fn) > threshold:
-                expand_right = False
-            else:
-                alphas_upper = alphas_upper + sector_width
-                total_samples= np.append(total_samples, sampled_upper, axis=0)
-
-    diff = num_samples - total_samples.shape[0]
-    if diff > 0:
-        # To few samples are drawn
-        additional_samples = sample_grid(abs(diff), radius_inner, radius_outer,
-         alphas_lower, alphas_upper, original_instance)
-        total_samples = np.append(total_samples, additional_samples, axis=0)
-
-    # Remove edge cases where a negative sample was drawn
-    cleaned_samples = total_samples[(predictor_fn(total_samples) > 0.5)]
-
-    if diff > 0:
-        # To many samples are drawn, thus remove some by random choice
-        # TODO: Implement Choice with masks
-        pass
-
-    print('TOTAL:', total_samples)
-    print('TOTAL-SHAPE:', total_samples.shape)
-    print('CLEAN-SHAPE:', cleaned_samples.shape)
-
-    return cleaned_samples
 
 def plot(points):
     """
@@ -266,7 +198,7 @@ def retrieve_features(instance, feature_positions):
     """
     return instance[feature_positions]
 
-def magnetic_sampling_restricted(predictor_fn,
+def magnetic_sampling(predictor_fn,
                     original_instance,
                     adversarial_instance,
                     num_samples,
@@ -331,6 +263,7 @@ def magnetic_sampling_restricted(predictor_fn,
                 total_samples= np.append(total_samples, sampled_upper, axis=0)
 
     diff = num_samples - total_samples.shape[0]
+    print('diff: ', diff)
     if diff > 0:
         # To few samples are drawn
         additional_samples = sample_grid(abs(diff), radius_inner, radius_outer,
@@ -343,7 +276,9 @@ def magnetic_sampling_restricted(predictor_fn,
     # cleaned_samples = total_samples[(predictor_fn(total_samples) > 0.5)]
     cleaned_samples = clean(total_samples, predictor_fn)
 
-    if diff > 0:
+    if diff < 0:
+        take = np.random.choice(len(cleaned_samples), num_samples)
+        cleaned_samples = cleaned_samples[take]
         # To many samples are drawn, thus remove some by random choice
         # TODO: Implement Choice with masks
         pass
@@ -360,19 +295,3 @@ def clean(samples, predictor_fn):
             result.append(sample)
 
     return np.array(result)
-
-
-
-# Testing
-if __name__ == '__main__':
-    # o = np.array([0.5,0.5])
-    # a = np.array([1,1])
-    # samples = magnetic_sampling_restricted(test_pred, o, a, 20, [0,1], confidence=10)
-    # plot(samples)
-    mean = [0,0,0,0]
-    sigma = np.array([0.1, 0.1, 0.1, 0.1])
-    cov = np.diag(sigma**2)
-    result = np.random.multivariate_normal(mean, cov, 10)
-    print(result)
-
-# print(create_ranges(np.array([1,1,2]), np.array([1,10,5]), 5).T)

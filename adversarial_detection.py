@@ -5,17 +5,13 @@ from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 import gradientgrow
 import init
-from magnetic_sampling import magnetic_sampling_restricted
+from magnetic_sampling import magnetic_sampling
 
 import matplotlib.pyplot as plt
 from matplotlib import style
 style.use("ggplot")
 
 
-"""
-adversarial detection based on LAD improved by GradientSearch, MagneticSampling
-Binary Search on the LAD segments
-"""
 
 def get_border_touchpoints(support_points, original_instance, predictor_fn, fineness=5):
     """
@@ -43,15 +39,17 @@ def sample_around(border_touchpoints, num_samples, sigma):
     Samples around the border_touchpoints with a normal distribution to generate
     a dataset for training a linear model which yields the explanation
 
-    TODO: Enable restricted mode only sampling in the chosen_attributes
+    Normal distribution is parametrized based on the distribution of
+    the border_touchpoints, so that we sample along the decision boundary
+
     """
     max_arg = np.amax(border_touchpoints, axis=0)
     min_arg = np.amin(border_touchpoints, axis=0)
     result = np.array(border_touchpoints)
     num_per_point = int(num_samples / len(border_touchpoints))
+    sigmas = (max_arg - min_arg)*sigma
     for point in border_touchpoints:
         mean = point
-        sigmas = (max_arg - min_arg)*0.1
         cov = np.diag(sigmas**2)
         rand = np.random.multivariate_normal(mean, cov, num_per_point)
         result = np.append(result, rand, axis=0)
@@ -77,42 +75,48 @@ def explain_instance(instance, predictor_fn, dataset, chosen_attributes):
     dec = get_first_adversarial(instance, predictor_fn, dataset, chosen_attributes)
     first_adversarial = dec.get_last_instance()
     path = np.array(dec.GSP)
-    print('path: ', path)
+
     # magnetic_sampling uses the predictor_fn not the predictor, thus pass the corresponding fct
-    support_points = magnetic_sampling_restricted(predictor_fn.predict_proba,
+    support_points = magnetic_sampling(predictor_fn.predict_proba,
                             instance,
                             first_adversarial,
-                            num_samples=10,
+                            num_samples=15,
                             features=chosen_attributes,
-                            sector_width=0.00001)
+                            sector_width=0.35,
+                            confidence=5,
+                            threshold=2
+                            )
 
-    border_touchpoints = get_border_touchpoints(support_points, instance, predictor_fn)
+    border_touchpoints = get_border_touchpoints(support_points,
+                                                instance,
+                                                predictor_fn,
+                                                fineness=5)
     X = sample_around(border_touchpoints, 1000, 0.1)
 
-    print('input', X)
     y = predictor_fn.predict_proba(X)[:,1]
     pos = y[y > 0.5]
     neg = y[y <= 0.5]
-    print('pred results: ', y)
     print('positive ', pos.size)
     print('negative ', neg.size)
 
+    # generate colormap
     colors = []
     for y_i in y:
         if y_i > 0.5:
             colors.append('limegreen')
         else:
             colors.append('tomato')
-    # plt.scatter(X[:, 0], X[:, 5], c=['limegreen'*int(y[i])+'tomato'*(1-int(y[i])) for i in range(len(y))], cmap = plt.cm.Paired, marker='.', s=25)
+
+    # Plots
     plt.scatter(X[:, 0], X[:, 5], c=colors, cmap = plt.cm.Paired, marker='.', s=25)
     plt.scatter([instance[0]], [instance[5]], s=100, c='blue', marker='X')
     plt.scatter([first_adversarial[0]], [first_adversarial[5]], s=100, c='red', marker='X')
     plt.scatter([support_points[:,0]], [support_points[:,5]], s=100, c='purple', marker='o')
     plt.scatter([border_touchpoints[:,0]], [border_touchpoints[:,5]], s=100, c='black', marker='.')
-    plt.scatter(path[:,1], path[:,2], s=100, c='yellow', marker='.')
+    # plt.scatter(path[:,1], path[:,2], s=100, c='yellow', marker='.')
     plt.xlabel("Attribut " + str(0))
     plt.ylabel("Attribut " + str(5))
-    plt.title("Attributraum und dessen Klassifizierung")
+    plt.title("Preliminary Results of adversarial Detection")
     plt.show()
 
     dec.sectorSearch(fineness=50)
@@ -134,8 +138,8 @@ def test():
 
     # chose two parameters to adjust
     chosen_attributes = [0,5]
-    print('test instance: ', X_test[14])
-    explain_instance(X_test[23], predictor, X, chosen_attributes)
+    print('test instance: ', X_test[15])
+    explain_instance(X_test[15], predictor, X, chosen_attributes)
 
 if __name__ == '__main__':
     test()
