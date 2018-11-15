@@ -83,16 +83,16 @@ def finalEvaluation(jobs=103):
             # +--------------+
             # | GradientGrow |
             # +--------------+
-            dec = gradientgrow.decision(X, chosen_attr=[attr1, attr2], instance=X_test[i], clf=clf)
+            dec = gradientgrow.Decision(X, chosen_attr=[attr1, attr2], instance=X_test[i], clf=clf)
 
             time0 = time.time()  # --- Starte Zeitmessung
             time1 = time.time()  # --- Starte Zeitmessung
-            dec.gradientSearch(step=0.05, scale=1.0, nsample=100)
+            dec.gradient_search(step=0.05, scale=1.0, nsample=100)
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg1.append(time2 - time1)
 
             time1 = time.time()  # --- Starte Zeitmessung
-            dec.sectorSearch(fineness=50)
+            dec.sector_search(fineness=50)
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg2.append(time2 - time1)
 

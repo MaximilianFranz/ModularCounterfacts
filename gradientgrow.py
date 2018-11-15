@@ -6,53 +6,115 @@ style.use("ggplot")
 from sklearn import svm
 
 
-class decision:
+class Decision:
     def __init__(self, dataset, chosen_attr, instance, clf):
+        """
+        Creates the decision object
+
+        Args:
+            dataset:
+            chosen_attr:
+            instance:
+            clf:
+        """
         self.chosen_attr = chosen_attr
         self.instance = list(instance)
         self.clf = clf
         self.dataset = np.array(dataset)
-        self.GSP = []
         self.last_instance = instance
-        self.walk_step = []
 
+        self.GSP = []
+        self.walk_step = []
         self.attr_range = []
         self.difference = []
 
+        # Defines the steps on the unit circle which to query
+        self.decision_list = [0, 0.5*np.pi, np.pi, 1.5*np.pi]
+
         # Define the value ranges for the chosen attributes
-        # Store difference between upper and lower boundaries - NOT USED
         for item in self.chosen_attr:
             self.attr_range.append([min(self.dataset[:,item]),
                                     max(self.dataset[:,item])])
-            self.difference.append((max(self.dataset[:,item])
-                                    - min(self.dataset[:,item]))*0.2)
 
     def get_last_instance(self):
         """
-        Returns complete instance with the modification of the last
-        element in GSP
+
+        Returns: the last instance of the GradientSearchPath
+
         """
         dummy = np.array(self.instance)
         dummy[self.chosen_attr] = self.last_instance[1:3]
         return dummy
 
-
-
-    ###########################################################################
-    # gradientSearch ##########################################################
-    ###########################################################################
-    def gradientSearch(self, step=0.01, scale=0.5, nsample=50):
+    def get_possible_candidates(self, count, angle, factor=1):
         """
-        Perfoms the GradientSearch step of GradientGrow
-
-
+        Selects point on the unit_circle around the instance at position count in GSP
 
         Args:
-            step:
-            scale: scale to use in search_far
-            nsample: number of samples
+            count: position in the GSP which
+            angle: variation of the decisions
+            factor: factor by which to scale the circle, used in search_far
+
+        Returns: list of possible candidates around the instance specified through count
+
         """
-        def search_far(element, last_pred, scale):
+        poss_cands = []
+        for i in range(len(self.decision_list)):
+            coord1 = self.GSP[count][1] + np.cos(self.decision_list[i] + angle) * self.walk_step[0] * factor
+            coord2 = self.GSP[count][2] + np.sin(self.decision_list[i] + angle) * self.walk_step[1] * factor
+
+            dummy = np.array(self.instance)
+            dummy[self.chosen_attr] = [coord1, coord2]
+            coord3 = np.array(self.clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
+
+            poss_cands.append([i, coord1, coord2, coord3])
+
+        return poss_cands
+
+    def filter_possible_candidates(self, possible_candidates):
+        """
+        Filters out edge cases in possible candidates
+
+        Cases which are outside the boundaries of the attribute
+        range of the dataset are thrown out
+
+        Args:
+            possible_candidates: possible candidates to be filtered
+
+        Returns: list of candidates that fit the requirements
+        """
+        for i in range(len(possible_candidates) - 1, -1, -1):
+            # traverse backwards
+            if((possible_candidates[i][1] < self.attr_range[0][0])
+                    or (possible_candidates[i][1] > self.attr_range[0][1])
+                    or (possible_candidates[i][2] < self.attr_range[1][0])
+                    or (possible_candidates[i][2] > self.attr_range[1][1])):
+                        # pop candidates outside the attribute range
+                        possible_candidates.pop(i)
+
+        return possible_candidates
+
+    def choose_one_candidate(self, possible_candidates):
+        """
+        Selects the best out of possible candidates if needed
+        Args:
+            possible_candidates: list of possible candidates
+
+        Returns: the best candidate
+
+        """
+        if len(possible_candidates) is 1:
+            return possible_candidates[0]
+        else:
+            # Choose candidate which maximizes prediction probability
+            possible_candidates = np.array(possible_candidates)[np.array(possible_candidates)[:,3]
+                                                                == max(np.array(possible_candidates)[:,3])]
+
+            # If multiple candidates meet the maximum criteria, choose one randomly
+            return possible_candidates[np.random.choice(len(possible_candidates), 1)][0]
+
+
+    def search_far(self, count, last_prediction, scale):
             """
             HELPER: Scales the search sphere if no better prediction is found
 
@@ -60,47 +122,23 @@ class decision:
             gradientSearch do not improve the results. The factor is increased
             by 'scale' every round until a better point is found.
 
-            TODO:
-                * don't use global variables that are not specified as
-                  arguments or class variables. E.g. `decision_list`, can be refactored
-                  to a class variable.
-                * Avoid duplicate code and instead enable search_far via a
-                  toggle variable.
-
             Args:
-                element: NOT USED, REFACTOR!
-                last_pred: last prediction in normal search path
+                count: Current count, where to insert in the GSP
+                last_prediction: last prediction in normal search path
                 scale: size of increase per step
 
             Returns:
                 chosen:
             """
-            current_pred = np.round(last_pred, decimals=3)
+            current_pred = np.round(last_prediction, decimals=3)
             factor = 1
-            while ((last_pred >= current_pred) & (current_pred <= 0.5)):
+            while ((last_prediction >= current_pred) & (current_pred <= 0.5)):
                 # While current prediction is worse than last_pred
                 factor = factor + scale
                 angle = np.random.uniform(-0.25*np.pi, 0.25*np.pi)
-                poss_cands = []
-                for i in range(0, len(decision_list)):
-                    #coord1 = element[1] + decision_list[i][0] * self.walk_step[0] * factor
-                    #coord2 = element[2] + decision_list[i][1] * self.walk_step[1] * factor
-                    coord1 = self.GSP[count][1] + np.cos(decision_list[i] + angle) * self.walk_step[0] * factor
-                    coord2 = self.GSP[count][2] + np.sin(decision_list[i] + angle) * self.walk_step[1] * factor
-                    dummy = list(self.instance)
-                    dummy[self.chosen_attr[0]] = coord1
-                    dummy[self.chosen_attr[1]] = coord2
-                    coord3 = np.array(self.clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
+                poss_cands = self.get_possible_candidates(count, angle, factor)
 
-                    poss_cands.append([i, coord1, coord2, coord3])
-
-                size = len(poss_cands)
-                for i in range(0,size):
-                    if((poss_cands[size-i-1][1] < self.attr_range[0][0])
-                            | (poss_cands[size-i-1][1] > self.attr_range[0][1])
-                            | (poss_cands[size-i-1][2] < self.attr_range[1][0])
-                            | (poss_cands[size-i-1][2] > self.attr_range[1][1])):
-                        poss_cands.pop(size-i-1)
+                poss_cands = self.filter_possible_candidates(poss_cands)
 
                 x = np.array(poss_cands)[np.array(poss_cands)[:,3] == max(np.array(poss_cands)[:,3])]
                 poss_cands = [list(x[i]) for i in range(0,len(x))]
@@ -111,65 +149,63 @@ class decision:
             return chosen
 
 
-        #--- Find Decision Border
+    ###########################################################################
+    # gradientSearch ##########################################################
+    ###########################################################################
+    def gradient_search(self, step=0.01, scale=0.5, nsample=50):
+        """
+        Perfoms the GradientSearch step of GradientGrow
 
+        The Goal is to find an adversarial instance by following a path toward
+        prediction > 0.5.
+        This is done by querying 4 instances on the unit circle around the start instance.
+        The best instance is choosen and the same procedure is performed from there. All steps
+        are stored in the GSP class variable.
+
+        Args:
+            step: step size relative to attribute dimension
+            scale: scale to use in search_far
+            nsample: number of samples
+        """
+
+        # Prep walk step sizes
         for item in self.attr_range:
             self.walk_step.append((item[1] - item[0])*step)
 
         # Define decision points as intervals on the unit circle in spherical coords
         decision_list = [0, 0.5*np.pi, np.pi, 1.5*np.pi]
-        possible_decisions = list(range(0, len(decision_list)))
 
         # set counter and check variable, which indicates whether a
         # positive example has been found
         count = 0
-        check = 0
+        check = True
+
         # add the original instance to the Search path with its probability
         last_prediction = np.array(self.clf.predict_proba(np.array(self.instance).reshape(1, -1))[0])[1]
         self.GSP.append([count,
                         self.instance[self.chosen_attr[0]],
                         self.instance[self.chosen_attr[1]],
                         last_prediction])
-        print(self.GSP[count])
 
-        while check == 0:
-            possible_cands = []
+        while check:
             angle = np.random.uniform(-0.25*np.pi, 0.25*np.pi)
-            for i in possible_decisions:
-                # Evaluate all possible decisions
-                coord1 = self.GSP[count][1] + np.cos(decision_list[i] + angle) * self.walk_step[0]
-                coord2 = self.GSP[count][2] + np.sin(decision_list[i] + angle) * self.walk_step[1]
 
-                dummy = np.array(self.instance)
-                dummy[self.chosen_attr] = [coord1, coord2]
-                coord3 = np.array(self.clf.predict_proba(dummy.reshape(1, -1))[0])[1]
-
-                possible_cands.append([i, coord1, coord2, coord3])
-
-            size = len(possible_cands)
-            for i in range(0,size):
-                if((possible_cands[size-i-1][1] < self.attr_range[0][0])
-                        | (possible_cands[size-i-1][1] > self.attr_range[0][1])
-                        | (possible_cands[size-i-1][2] < self.attr_range[1][0])
-                        | (possible_cands[size-i-1][2] > self.attr_range[1][1])):
-                    possible_cands.pop(size-i-1)
-
-            possible_cands = np.array(possible_cands)[np.array(possible_cands)[:,3] == max(np.array(possible_cands)[:,3])]
-
-            # If multiple candidates meet the maximum criteria, choose randomly
-            choice = possible_cands[np.random.choice(range(len(possible_cands)))]#???
+            possible_candidates = self.get_possible_candidates(count, angle)
+            possible_candidates = self.filter_possible_candidates(possible_candidates)
+            choice = self.choose_one_candidate(possible_candidates)
+            print(choice)
 
             if choice[3] <= last_prediction:
                 # If no better choice found, use search_far
-                choice = search_far(element=self.GSP[count], last_pred=last_prediction, scale=scale)
+                choice = self.search_far(count, last_prediction=last_prediction, scale=scale)
 
-            possible_decisions = list(range(len(decision_list)))
-            possible_decisions.remove(choice[0])
-            count = count + 1
+            count += 1
             choice[0] = count
             self.GSP.append(choice)
             print('Choice: ', choice)
-            check = check + (choice[3] > 0.5)
+            if choice[3] > 0.5 :
+                check = False
+
             self.last_instance = choice
             last_prediction = choice[3]
 
@@ -178,7 +214,7 @@ class decision:
     ###########################################################################
     # SectorSearch ############################################################
     ###########################################################################
-    def sectorSearch(self, fineness=50):
+    def sector_search(self, fineness=50):
         """
 
         Args:
@@ -188,9 +224,17 @@ class decision:
             void
 
         """
-        v1 = [np.array(self.GSP)[0,1] - np.array(self.GSP)[-1,1], np.array(self.GSP)[0,2] - np.array(self.GSP)[-1,2]]
-        v2 = [np.array(self.GSP)[-2,1] - np.array(self.GSP)[-1,1], np.array(self.GSP)[-2,2] - np.array(self.GSP)[-1,2]]
-        v3 = [v2[0]-v1[0], v2[1]-v1[1]]
+
+        # Prepare direction vectors v1, v2, v3 between last element, first element and next to last element in GSP
+        v1 = (np.array(self.GSP)[0] - np.array(self.GSP)[-1])[1:3]
+        v2 = (np.array(self.GSP)[-2] - np.array(self.GSP)[-1])[1:3]
+        v3 = v2 - v1
+
+        # v1 = [np.array(self.GSP)[0, 1] - np.array(self.GSP)[-1, 1],
+        #       np.array(self.GSP)[0, 2] - np.array(self.GSP)[-1, 2]]
+        # v2 = [np.array(self.GSP)[-2, 1] - np.array(self.GSP)[-1, 1],
+        #       np.array(self.GSP)[-2, 2] - np.array(self.GSP)[-1, 2]]
+        # v3 = [v2[0] - v1[0], v2[1] - v1[1]]
 
         v1 = [v1[0]/fineness, v1[1]/fineness]
         v2 = [v2[0]/fineness, v2[1]/fineness]
@@ -200,7 +244,7 @@ class decision:
         check = 0
         factor = 1
         while (check < 6):
-            rand = 0#np.random.uniform(-v3[0]/8, v3[0]/8)
+            rand = 0 # np.random.uniform(-v3[0]/8, v3[0]/8) LATER?
             for i in range(1, 5):
                 dummy = list(self.instance)
                 dummy[self.chosen_attr[0]] = np.array(self.GSP)[-1,1] + (v1[0] + v3[0]*(i*2-1)/8 + rand)*(factor + (i==2) + (i==3))

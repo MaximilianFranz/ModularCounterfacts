@@ -91,11 +91,12 @@ class AdversarialDetection():
         instance to feed into magnetic_sampling.
         """
         # GradientSearch returns only the two chosen attributes
-        dec = gradientgrow.decision(self.X,
+        dec = gradientgrow.Decision(self.X,
                                     self.chosen_attributes,
                                     original_instance,
                                     self.clf)
-        dec.gradientSearch(step=0.05, scale=1.0, nsample=100)
+        dec.gradient_search(step=0.05, scale=1.0, nsample=100)
+        print('here')
         self.gradientGrow = dec
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
@@ -108,7 +109,7 @@ class AdversarialDetection():
         if chosen_attributes is not None:
             self.chosen_attributes = chosen_attributes
         # TODO: Make sure to handle cases without chosen_attributes accordingly
-        first_adversarial = self.get_first_adversarial(instance);
+        first_adversarial = self.get_first_adversarial(instance)
 
         # magnetic_sampling uses the predictor_fn not the predictor,
         # thus pass the corresponding fct
@@ -130,9 +131,14 @@ class AdversarialDetection():
 
         self.predictions = self.clf.predict_proba(self.sample_set)[:,1]
         self.plot_results()
-        dec.sectorSearch(fineness=50)
+        # dec.sectorSearch(fineness=50)
 
     def plot_results(self):
+        """
+        Plots results of the explanation if all steps have been performed
+
+        Returns: -
+        """
         if self.predictions is not None:
 
             pos = self.predictions[self.predictions > 0.5]
@@ -140,7 +146,7 @@ class AdversarialDetection():
             print('positive ', pos.size)
             print('negative ', neg.size)
 
-            # generate colormap
+            # generate colormap for predictions
             colors = []
             for y_i in self.predictions:
                 if y_i > 0.5:
