@@ -124,7 +124,7 @@ def explain_instance(instance, predictor_fn, dataset, chosen_attributes):
 
 def test():
 
-    X, Y = init.load_data_txt()
+    X, Y = init.load_data_txt(normalize=True)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1000)
 
     # --- Train Random Forest
