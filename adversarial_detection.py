@@ -2,7 +2,9 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import StandardScaler
 import numpy as np
+import pandas as pd
 import gradientgrow
 import init
 from magnetic_sampling import magnetic_sampling
@@ -11,6 +13,33 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 style.use("ggplot")
 
+
+class AdversarialDetection():
+
+    def __init__(self, dataset_file, clf):
+        """
+
+        Args:
+            dataset_file:
+            clf:
+        """
+        self.X, self.Y = self.load_data_txt(normalize=True)
+        self.clf = clf
+        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=0.2, random_state=1000)
+        self.clf.fit(X_train, Y_train)
+
+
+
+    def load_data_txt(normalize=False):
+        data = pd.read_csv("UCI_Credit_Card.csv")
+
+        Y = np.array(data.pop("default.payment.next.month"))
+        data.pop("ID")
+        X = np.array(data)
+        if normalize:
+            X = StandardScaler().fit_transform(X)
+
+        return X, Y
 
 
 def get_border_touchpoints(support_points, original_instance, predictor_fn, fineness=5):
