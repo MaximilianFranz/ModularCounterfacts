@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import gradientgrow
 import init
-from magnetic_sampling import magnetic_sampling
+import time
+from magnetic_sampling import MagneticSampler
 
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -25,6 +26,7 @@ class AdversarialDetection():
         self.clf = clf
         self.chosen_attributes = chosen_attributes
         self.scaler = StandardScaler().fit(self.X)
+        self.ms = MagneticSampler(clf, None)
 
 
 
@@ -97,7 +99,6 @@ class AdversarialDetection():
                                     original_instance,
                                     self.clf)
         dec.gradient_search(step=0.05, scale=1.0, nsample=100)
-        print('here')
         self.gradientGrow = dec
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
@@ -126,27 +127,39 @@ class AdversarialDetection():
 
         # magnetic_sampling uses the predictor_fn not the predictor,
         # thus pass the corresponding fct
-        self.support_points = magnetic_sampling(self.clf.predict_proba,
+        one = time.time()
+        self.support_points = self.ms.magnetic_sampling(self.clf.predict_proba,
                                 instance,
                                 self.first_adversarial,
-                                num_samples=15,
+                                num_samples=5,
                                 features=self.chosen_attributes,
                                 sector_width=0.35,
                                 confidence=5,
                                 threshold=2
                                 )
+        two = time.time()
+        print('ms time: ', two - one)
 
+        one = time.time()
         self.border_touchpoints = self.get_border_touchpoints(self.support_points,
                                                     self.instance,
                                                     self.clf,
                                                     fineness=5)
-        self.sample_set = self.sample_around(self.border_touchpoints, num_samples, locality)
+        two = time.time()
+        print('border_touchpoints time: ', two - one)
 
+        one = time.time()
+        self.sample_set = self.sample_around(self.border_touchpoints, num_samples, locality)
         self.predictions = self.clf.predict_proba(self.sample_set)[:,1]
-        for i in range(len(self.predictions)):
-            self.predictions[i] = int(self.predictions[i] > 0.5)
+        two = time.time()
+        print('sample-predict time: ', two - one)
+
+        one = time.time()
+        self.predictions = np.round(self.predictions)
         self.explainer = self.train_explainer()
         self.explainer_prediction = self.explainer.predict(self.sample_set[:, self.chosen_attributes])
+        two = time.time()
+        print('train explainer time: ', two - one)
 
         # Clf trained on only 2D data -> take the only two coefs
         self.m = (-1)*self.explainer.coef_[0] / self.explainer.coef_[1]
@@ -166,8 +179,8 @@ class AdversarialDetection():
             print('negative ', neg.size)
 
             print('exp pos: ', self.explainer_prediction[self.explainer_prediction > 0.5].size)
-            acc = self.explainer_prediction[self.explainer_prediction > 0.5].size / pos.size
-            print('acc of explainer ', acc )
+            score = self.explainer.score(self.sample_set[:, self.chosen_attributes], self.predictions)
+            print('score of explainer ', score )
 
             # generate colormap for predictions
             colors = []
@@ -183,8 +196,6 @@ class AdversarialDetection():
             attr2 = self.chosen_attributes[1]
 
             # Create explainer space for 2-D representation
-            self.m = (-1)*self.explainer.coef_[0] / self.explainer.coef_[1]
-            self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
             x_min = np.min(self.sample_set[:, attr1])
             x_max = np.max(self.sample_set[:, attr1])
             x_line = np.linspace(x_min, x_max, 100)
