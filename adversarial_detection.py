@@ -26,7 +26,7 @@ class AdversarialDetection():
         self.clf = clf
         self.chosen_attributes = chosen_attributes
         self.scaler = StandardScaler().fit(self.X)
-        self.ms = MagneticSampler(clf, None)
+        self.ms = MagneticSampler(clf, self.scaler)
 
 
 
@@ -218,7 +218,7 @@ def test():
 
     chosen_attributes = [0,5]
     clf = RandomForestClassifier(n_jobs=100, n_estimators=50, random_state=5000)
-    X, Y = init.load_data_txt(normalize=True)
+    X, Y = init.load_data_txt(normalize=False)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1000)
     clf.fit(X_train, Y_train)
 

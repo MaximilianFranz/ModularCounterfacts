@@ -196,6 +196,11 @@ class MagneticSampler():
             Full instnances created by updating copies of the original_instance at
             the desired features with the new features created through magnetic_sampling
         """
+        if self.scaler is not None:
+            original_instance = self.scaler.transform(original_instance.reshape(1,-1))[0]
+            adversarial_instance = self.scaler.transform(adversarial_instance.reshape(1,-1))[0]
+
+
         expand_right = True
         expand_left = True
 
@@ -265,4 +270,6 @@ class MagneticSampler():
         print('TOTAL-SHAPE:', total_samples.shape)
         print('CLEAN-SHAPE:', cleaned_samples.shape)
 
+        if self.scaler is not None:
+            return self.scaler.inverse_transform(cleaned_samples)
         return cleaned_samples
