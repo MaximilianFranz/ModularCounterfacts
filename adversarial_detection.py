@@ -16,14 +16,15 @@ style.use("ggplot")
 
 class AdversarialDetection():
 
-    def __init__(self, clf, chosen_attributes=None):
+    def __init__(self, X, clf, chosen_attributes=None):
         """
+        X: the dataset
+        clf: must be fit before
         """
-        self.X, self.Y = self.load_data_txt(normalize=True)
+        self.X = X
         self.clf = clf
-        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=0.2, random_state=1000)
-        self.clf.fit(X_train, Y_train)
         self.chosen_attributes = chosen_attributes
+        self.scaler = StandardScaler().fit(self.X)
 
 
 
@@ -101,7 +102,19 @@ class AdversarialDetection():
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
 
-    def explain_instance(self, instance, chosen_attributes=None):
+    def train_explainer(self):
+        """
+        Trains a Ridge classifier on the sampled data considering only
+        the chosen_attributes for now, for simplicity
+        """
+        X = self.sample_set[:, self.chosen_attributes]
+        y = self.predictions
+        clf = Ridge(alpha=0.1)
+        clf.fit(X,y)
+        self.explainer = clf
+        return self.explainer
+
+    def explain_instance(self, instance, num_samples=1000, locality=0.1, chosen_attributes=None):
         """
         Using the functions provided in this module this returns a linear
         """
@@ -109,13 +122,13 @@ class AdversarialDetection():
         if chosen_attributes is not None:
             self.chosen_attributes = chosen_attributes
         # TODO: Make sure to handle cases without chosen_attributes accordingly
-        first_adversarial = self.get_first_adversarial(instance)
+        self.first_adversarial = self.get_first_adversarial(instance)
 
         # magnetic_sampling uses the predictor_fn not the predictor,
         # thus pass the corresponding fct
         self.support_points = magnetic_sampling(self.clf.predict_proba,
                                 instance,
-                                first_adversarial,
+                                self.first_adversarial,
                                 num_samples=15,
                                 features=self.chosen_attributes,
                                 sector_width=0.35,
@@ -127,11 +140,17 @@ class AdversarialDetection():
                                                     self.instance,
                                                     self.clf,
                                                     fineness=5)
-        self.sample_set = self.sample_around(self.border_touchpoints, 1000, 0.1)
+        self.sample_set = self.sample_around(self.border_touchpoints, num_samples, locality)
 
         self.predictions = self.clf.predict_proba(self.sample_set)[:,1]
-        self.plot_results()
-        # dec.sectorSearch(fineness=50)
+        for i in range(len(self.predictions)):
+            self.predictions[i] = int(self.predictions[i] > 0.5)
+        self.explainer = self.train_explainer()
+        self.explainer_prediction = self.explainer.predict(self.sample_set[:, self.chosen_attributes])
+
+        # Clf trained on only 2D data -> take the only two coefs
+        self.m = (-1)*self.explainer.coef_[0] / self.explainer.coef_[1]
+        self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
 
     def plot_results(self):
         """
@@ -146,6 +165,10 @@ class AdversarialDetection():
             print('positive ', pos.size)
             print('negative ', neg.size)
 
+            print('exp pos: ', self.explainer_prediction[self.explainer_prediction > 0.5].size)
+            acc = self.explainer_prediction[self.explainer_prediction > 0.5].size / pos.size
+            print('acc of explainer ', acc )
+
             # generate colormap for predictions
             colors = []
             for y_i in self.predictions:
@@ -159,12 +182,21 @@ class AdversarialDetection():
             attr1 = self.chosen_attributes[0]
             attr2 = self.chosen_attributes[1]
 
+            # Create explainer space for 2-D representation
+            self.m = (-1)*self.explainer.coef_[0] / self.explainer.coef_[1]
+            self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
+            x_min = np.min(self.sample_set[:, attr1])
+            x_max = np.max(self.sample_set[:, attr1])
+            x_line = np.linspace(x_min, x_max, 100)
+            y_line = self.m * x_line + self.b
+
             # Plots
             plt.scatter(self.sample_set[:, attr1], self.sample_set[:, attr2], c=colors, cmap = plt.cm.Paired, marker='.', s=25)
             plt.scatter([self.instance[attr1]], [self.instance[attr2]], s=100, c='blue', marker='X')
             plt.scatter([self.first_adversarial[attr1]], [self.first_adversarial[attr2]], s=100, c='red', marker='X')
             plt.scatter([self.support_points[:, attr1]], [self.support_points[:, attr2]], s=30, c='purple', marker='o')
             plt.scatter([self.border_touchpoints[:, attr1]], [self.border_touchpoints[:, attr2]], s=100, c='black', marker='.')
+            plt.plot(x_line, y_line, 'b-', lw=1)
             plt.xlabel("Attribut " + str(attr1))
             plt.ylabel("Attribut " + str(attr2))
             plt.title("Preliminary Results of adversarial Detection")
@@ -175,12 +207,14 @@ def test():
 
     chosen_attributes = [0,5]
     clf = RandomForestClassifier(n_jobs=100, n_estimators=50, random_state=5000)
-    explainer = AdversarialDetection(clf=clf, chosen_attributes=chosen_attributes)
-
     X, Y = init.load_data_txt(normalize=True)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1000)
+    clf.fit(X_train, Y_train)
 
-    explainer.explain_instance(X_test[15])
+    explainer = AdversarialDetection(X, clf=clf, chosen_attributes=chosen_attributes)
+
+    explainer.explain_instance(X_test[15], num_samples=600)
+    explainer.plot_results()
 
 if __name__ == '__main__':
     test()
