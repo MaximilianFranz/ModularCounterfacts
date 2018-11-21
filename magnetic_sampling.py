@@ -176,16 +176,21 @@ def test_pred(samples):
     return np.array([f(xi) for xi in samples])
 
 
-def adjust_features(instance, feature_positions, feature_updates):
+def adjust_features(instance, feature_positions, feature_updates, restricted_original):
     """
     Given a complete instance feature vector this method adjusts only the
     features at the specified positions by adding the specified feature_updates
     and creating an array of complete feature vectors with the different changes
+
+
+    Also transposes the vector back to it position in the original space
     """
     result = np.array([instance])
     for f in feature_updates:
         new = instance.copy()
-        new[feature_positions] += f
+        # add the original instance again to move away from the origin back into
+        # the actual space
+        new[feature_positions] += (f - restricted_original)
         result = np.append(result, [new], axis=0)
 
     return result
@@ -229,6 +234,8 @@ def magnetic_sampling(predictor_fn,
     restricted_adversarial = adversarial_instance[features]
 
     # Prep parameters
+    # Note that we work on a distorted space, because we look at the vector between
+    # original instance and adversarial_instance, before clf we must redo this step.
     distance = np.linalg.norm(restricted_adversarial - restricted_original)
     print('distance', distance)
     radius_inner = distance - sector_depth / 2
@@ -244,7 +251,7 @@ def magnetic_sampling(predictor_fn,
             sampled_lower = sample_grid(confidence, radius_inner, radius_outer,
             alphas_lower, alphas_lower + sector_width, restricted_original)
 
-            errs = get_num_errors(adjust_features(original_instance, features, sampled_lower), predictor_fn)
+            errs = get_num_errors(adjust_features(original_instance, features, sampled_lower, restricted_original), predictor_fn)
 
             if errs > threshold:
                 expand_left = False
@@ -255,7 +262,7 @@ def magnetic_sampling(predictor_fn,
             sampled_upper = sample_grid(confidence, radius_inner, radius_outer,
             alphas_upper - sector_width, alphas_upper, restricted_original)
 
-            errs = get_num_errors(adjust_features(original_instance, features, sampled_upper), predictor_fn)
+            errs = get_num_errors(adjust_features(original_instance, features, sampled_upper, restricted_original), predictor_fn)
             if errs > threshold:
                 expand_right = False
             else:
@@ -270,7 +277,7 @@ def magnetic_sampling(predictor_fn,
          alphas_lower, alphas_upper, restricted_original)
         total_samples = np.append(total_samples, additional_samples, axis=0)
 
-    total_samples = adjust_features(original_instance, features, total_samples)
+    total_samples = adjust_features(original_instance, features, total_samples, restricted_original)
 
     # Remove edge cases where a negative sample was drawn
     # cleaned_samples = total_samples[(predictor_fn(total_samples) > 0.5)]
