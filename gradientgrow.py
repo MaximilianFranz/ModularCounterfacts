@@ -1,6 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt2
+# import matplotlib.pyplot as plt
 from matplotlib import style
 style.use("ggplot")
 from sklearn import svm
@@ -261,13 +260,13 @@ class Decision:
         Xgreen = np.array(data)[(np.array(label) >= 0.5)]
         Xred = np.array(data)[(np.array(label) < 0.5)]
 
-        plt.scatter(np.array(self.GSP)[-1,1], np.array(self.GSP)[-1,2], s=100, color='black', marker='X')
-        plt.scatter(np.array(self.GSP)[-2,1], np.array(self.GSP)[-2,2], s=50, color='blue', marker='X')
-        plt.scatter(list(np.array(Xgreen)[:,0]), list(np.array(Xgreen)[:,1]), s=40, color='green', marker='x')
-        plt.scatter(list(np.array(Xred)[:,0]), list(np.array(Xred)[:,1]), s=40, color='red', marker='x')
-        plt.scatter([self.instance[self.chosen_attr[0]]], [self.instance[self.chosen_attr[1]]], s=100, c='blue', marker='X')
-        plt.title("Ergebnisse aus SectorSearch")
-        plt.show()
+        # plt.scatter(np.array(self.GSP)[-1,1], np.array(self.GSP)[-1,2], s=100, color='black', marker='X')
+        # plt.scatter(np.array(self.GSP)[-2,1], np.array(self.GSP)[-2,2], s=50, color='blue', marker='X')
+        # plt.scatter(list(np.array(Xgreen)[:,0]), list(np.array(Xgreen)[:,1]), s=40, color='green', marker='x')
+        # plt.scatter(list(np.array(Xred)[:,0]), list(np.array(Xred)[:,1]), s=40, color='red', marker='x')
+        # plt.scatter([self.instance[self.chosen_attr[0]]], [self.instance[self.chosen_attr[1]]], s=100, c='blue', marker='X')
+        # plt.title("Ergebnisse aus SectorSearch")
+        # plt.draw()
 
 
 
@@ -329,7 +328,7 @@ class Decision:
         self.svmQuick_c = -clf_svm.intercept_[0] / w1[1] * (scale_max2 - scale_min2) + scale_min2 - scale_min1*self.svmQuick_m
         x_line = np.linspace(x_min*(scale_max1 - scale_min1)+scale_min1,x_max*(scale_max1 - scale_min1)+scale_min1)
         y_line = self.svmQuick_m * x_line + self.svmQuick_c
-        plt.plot(x_line, y_line, 'k-', lw=1)
+        # plt.plot(x_line, y_line, 'k-', lw=1)
 
 
         #--- Predict the result by giving Data to the model
@@ -345,14 +344,14 @@ class Decision:
             X[j,0] = X[j,0] * (scale_max1 - scale_min1) + scale_min1
             X[j,1] = X[j,1] * (scale_max2 - scale_min2) + scale_min2
 
-        plt.contourf(xx, yy, Z, levels=[0.0,0.5,1.0], colors=('r','g'), alpha = 0.4)
-        plt.scatter(X[:, 0], X[:, 1], c=['green'*int(y[i])+'red'*(1-int(y[i])) for i in range(0,len(y))], cmap = plt.cm.Paired, marker='s', s=10)
-        plt.xlabel("Attribut " + str(self.chosen_attr[0]))
-        plt.ylabel("Attribut " + str(self.chosen_attr[1]))
-        plt.title("Lokale Entscheidungsgrenze mit SVMQuick")
-        plt.xlim(scale_min1, scale_max1)
-        plt.ylim(scale_min2, scale_max2)
-        plt.show()
+        # plt.contourf(xx, yy, Z, levels=[0.0,0.5,1.0], colors=('r','g'), alpha = 0.4)
+        # plt.scatter(X[:, 0], X[:, 1], c=['green'*int(y[i])+'red'*(1-int(y[i])) for i in range(0,len(y))], cmap = plt.cm.Paired, marker='s', s=10)
+        # plt.xlabel("Attribut " + str(self.chosen_attr[0]))
+        # plt.ylabel("Attribut " + str(self.chosen_attr[1]))
+        # plt.title("Lokale Entscheidungsgrenze mit SVMQuick")
+        # plt.xlim(scale_min1, scale_max1)
+        # plt.ylim(scale_min2, scale_max2)
+        # plt.draw()
 
 
 
@@ -479,14 +478,14 @@ class Decision:
         Xgreen = np.array(data)[(np.array(label) >= 0.5)]
         Xred = np.array(data)[(np.array(label) < 0.5)]
 
-        plt.scatter(np.array(self.GSP)[-1,1], np.array(self.GSP)[-1,2], s=100, color='black', marker='X')
-        plt.scatter(list(np.array(Xgreen)[:,0]), list(np.array(Xgreen)[:,1]), s=40, color='green', marker='x')
-        plt.scatter(list(np.array(Xred)[:,0]), list(np.array(Xred)[:,1]), s=40, color='red', marker='x')
-        plt.scatter([self.instance[self.chosen_attr[0]]], [self.instance[self.chosen_attr[1]]], s=100, c='blue', marker='X')
-        plt.xlabel("Attribut " + str(self.chosen_attr[0]))
-        plt.ylabel("Attribut " + str(self.chosen_attr[1]))
-        plt.title("Lokale Entscheidungsgrenze mit SVMQuick")
-        plt.show()
+        # plt.scatter(np.array(self.GSP)[-1,1], np.array(self.GSP)[-1,2], s=100, color='black', marker='X')
+        # plt.scatter(list(np.array(Xgreen)[:,0]), list(np.array(Xgreen)[:,1]), s=40, color='green', marker='x')
+        # plt.scatter(list(np.array(Xred)[:,0]), list(np.array(Xred)[:,1]), s=40, color='red', marker='x')
+        # plt.scatter([self.instance[self.chosen_attr[0]]], [self.instance[self.chosen_attr[1]]], s=100, c='blue', marker='X')
+        # plt.xlabel("Attribut " + str(self.chosen_attr[0]))
+        # plt.ylabel("Attribut " + str(self.chosen_attr[1]))
+        # plt.title("Lokale Entscheidungsgrenze mit SVMQuick nach Extension")
+        # plt.draw()
 
 
 
@@ -546,7 +545,7 @@ class Decision:
         c = -clf_svm.intercept_[0] / w[1] * (scale_max2 - scale_min2) + scale_min2 - scale_min1*m
         x_line = np.linspace(x_min*(scale_max1 - scale_min1)+scale_min1, x_max*(scale_max1 - scale_min1)+scale_min1)
         y_line = m * x_line + c
-        plt.plot(x_line, y_line, 'k-', lw=1)
+        # plt.plot(x_line, y_line, 'k-', lw=1)
 
         #--- Predict the result by giving Data to the model
         Z = clf_svm.predict(np.c_[xx.ravel(), yy.ravel()])
@@ -561,14 +560,14 @@ class Decision:
             X[j,0] = X[j,0] * (scale_max1 - scale_min1) + scale_min1
             X[j,1] = X[j,1] * (scale_max2 - scale_min2) + scale_min2
 
-        plt2.contourf(xx, yy, Z, levels=[0.0,0.5,1.0], colors=('r','g'), alpha = 0.4)
-        plt2.scatter(X[:, 0], X[:, 1], c=['green'*int(y[i])+'red'*(1-int(y[i])) for i in range(0,len(y))], cmap = plt.cm.Paired, marker='s', s=10)
-        plt2.xlabel(self.dataset.feature_names[self.chosen_attr[0]])
-        plt2.ylabel(self.dataset.feature_names[self.chosen_attr[1]])
-        plt2.title("Lokale Entscheidungsgrenze mit SVMQuick")
-        plt2.xlim(scale_min1, scale_max1)
-        plt2.ylim(scale_min2, scale_max2)
-        plt2.show()
+        # plt.contourf(xx, yy, Z, levels=[0.0,0.5,1.0], colors=('r','g'), alpha = 0.4)
+        plt.scatter(X[:, 0], X[:, 1], c=['green'*int(y[i])+'red'*(1-int(y[i])) for i in range(0,len(y))], cmap = plt.cm.Paired, marker='s', s=10)
+        plt.xlabel(self.dataset.feature_names[self.chosen_attr[0]])
+        plt.ylabel(self.dataset.feature_names[self.chosen_attr[1]])
+        plt.title("Lokale Entscheidungsgrenze mit SVMQuick - nach Bordergrowth")
+        plt.xlim(scale_min1, scale_max1)
+        plt.ylim(scale_min2, scale_max2)
+        # plt.draw()
 
 
         #--- SVM: y = m * x + c

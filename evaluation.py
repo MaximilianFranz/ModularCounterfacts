@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 import time
 import copy
 
@@ -12,6 +13,7 @@ import gradientgrow
 import analysis
 import lime
 import localsurrogate
+from adversarial_detection import AdversarialDetection
 
 
 def finalEvaluation(jobs=103):
@@ -38,8 +40,6 @@ def finalEvaluation(jobs=103):
     test_candidates = np.array(range(0, len(Y_test)))[clf.predict(X_test) == 0][9:jobs]
     test_candidates = np.delete(test_candidates,
                                 [9, 16, 17, 18, 22, 24, 25, 29, 32, 33, 36, 37, 66, 67, 71, 76, 78, 82, 87, 88])
-    print(test_candidates)
-
     # --- Initialize time-variables
     dt_ls = []
     dt_ls1 = []
@@ -50,6 +50,7 @@ def finalEvaluation(jobs=103):
     dt_gg4 = []
     dt_gg = []
     dt_lime = []
+    dt_adv = []
 
     # --- Initialize accuracy-variables
     acc_ls = []
@@ -91,26 +92,33 @@ def finalEvaluation(jobs=103):
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg1.append(time2 - time1)
 
+            print('ss-start')
             time1 = time.time()  # --- Starte Zeitmessung
             dec.sector_search(fineness=50)
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg2.append(time2 - time1)
+            print('ss-start')
 
+            print('localsvm-start')
             time1 = time.time()  # --- Starte Zeitmessung
             dec.svmLocal(nsample=200)
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg3.append(time2 - time1)
+            print('localsvm-end')
 
+            print('extension-start')
             time1 = time.time()  # --- Starte Zeitmessung
             dec.Extension(limit=20)
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg4.append(time2 - time1)
+            print('extension-end')
 
             dt_gg.append(time2 - time0)
 
             # +----------------+
             # | LIME-Explainer |
             # +----------------+
+            print('lime-start')
             myexp = lime.limeExplainer(X, X_test[i], [attr1, attr2], clf)
 
             time1 = time.time()  # --- Starte Zeitmessung
@@ -118,12 +126,14 @@ def finalEvaluation(jobs=103):
             time2 = time.time()  # --- Beende Zeitmessung
             dt_lime.append(time2 - time1)
 
+            print('lime-end')
             # init.createSpace(200, attr1, attr2, X_test[i], X, clf)
-            myexp.drawLIME(X_test[i], attr1, attr2)
+            # myexp.drawLIME(X_test[i], attr1, attr2)
 
             # +-----------------+
             # | Local Surrogate |
             # +-----------------+
+            print('localsurrogate-start')
             ls_exp = localsurrogate.localSurrogate(X, X_test[i], [attr1, attr2], clf)
 
             time0 = time.time()  # --- Starte Zeitmessung
@@ -138,21 +148,33 @@ def finalEvaluation(jobs=103):
             dt_ls2.append(time2 - time1)
 
             dt_ls.append(time2 - time0)
+            print('localsurrogate-end')
+            # ls_exp.drawLS(attr1, attr2)
 
-            ls_exp.drawLS(attr1, attr2)
+
+            time1 = time.time()
+            # adversarial with Magnetic Sampling
+            explainer = AdversarialDetection(X, clf=clf, chosen_attributes=[attr1, attr2])
+            explainer.explain_instance(X_test[i], num_samples=600)
+            time2 = time.time()
+            dt_adv.append(time2-time1)
 
             # +------------------+
             # | gemeinsamer Plot |
             # +------------------+
+            print('ana-start')
             ana = analysis.analysis(myexp.lime_m, myexp.lime_c, dec.svmQuick_m, dec.svmQuick_c, ls_exp.ls_m,
-                                    ls_exp.ls_c, attr1, attr2, myexp.mean, myexp.sigma, X_test[i], X_test, Y_test, clf,
+                                    ls_exp.ls_c, explainer.m, explainer.b, attr1, attr2, myexp.mean, myexp.sigma, X_test[i], X_test, Y_test, clf,
                                     dec.eval_range)
-            ana.drawAll(attr1, attr2)
-            ana.evaluation(attr1, attr2, nsample=200)
+            # ana.drawAll(attr1, attr2)
 
+            print('eval-start')
+            ana.evaluation(attr1, attr2, nsample=200)
+            #
             acc_lime.append(ana.accuracies[0])
             acc_gg.append(ana.accuracies[1])
             acc_ls.append(ana.accuracies[2])
+            break
 
     # --- Ausgabe der Ergebnisse
     print(" ")
@@ -188,6 +210,8 @@ def finalEvaluation(jobs=103):
     print("- GradientGrow:  ", str(round(np.mean(dt_gg4) * 1000) / 1000), "s (",
           str(round(np.std(dt_gg4) * 1000) / 1000), "s)")
     print("=================")
+    print("- AdversarialDetection with Magnetic Sampling: ", str(round(np.mean(dt_adv) * 1000) / 1000), "s (",
+          str(round(np.std(dt_lime) * 1000) / 1000), "s)")
     print("Es wurden insgesamt ", str(len(dt_lime)), " viele Instanzen evaluiert.")
     return True
 
