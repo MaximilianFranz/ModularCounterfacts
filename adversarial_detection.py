@@ -8,7 +8,9 @@ import pandas as pd
 import gradientgrow
 import init
 import time
+import copy
 from magnetic_sampling import MagneticSampler
+from nelder_mead import nelder_mead
 
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -27,6 +29,11 @@ class AdversarialDetection():
         self.chosen_attributes = chosen_attributes
         self.scaler = StandardScaler().fit(self.X)
         self.ms = MagneticSampler(clf, self.scaler)
+
+        self.max_point = np.amax(X, axis=0)
+        self.min_point = np.amin(X, axis=0)
+
+        self.max_distance = np.linalg.norm(self.max_point - self.min_point)
 
 
 
@@ -103,6 +110,31 @@ class AdversarialDetection():
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
 
+
+    def adversarial_with_nelder_mead(self, instance):
+        """
+        Prepare functions to work with nelder_mead
+        """
+        def distance(A, B):
+            """
+            NOT USED
+            distance normalized
+            """
+            dist = np.linalg.norm(A-B) / self.max_distance**(0.1)
+            # dist = np.sqrt(np.exp(-(d**2) / 0.25**2))
+            print(dist)
+            return dist
+
+        def func(X):
+            """
+            Returns the function to optimize
+            X must be np.array
+            """
+
+            return (1 - self.clf.predict_proba(X.reshape(1, -1))[0,1]) 
+
+        return nelder_mead(func, instance)[0]
+
     def train_explainer(self):
         """
         Trains a Ridge classifier on the sampled data considering only
@@ -123,7 +155,13 @@ class AdversarialDetection():
         if chosen_attributes is not None:
             self.chosen_attributes = chosen_attributes
         # TODO: Make sure to handle cases without chosen_attributes accordingly
-        self.first_adversarial = self.get_first_adversarial(instance)
+
+        one = time.time()
+        # self.first_adversarial = self.get_first_adversarial(instance)
+        self.first_adversarial = self.adversarial_with_nelder_mead(self.instance)
+        two = time.time()
+        print('adversarial time: ', two - one)
+
 
         # magnetic_sampling uses the predictor_fn not the predictor,
         # thus pass the corresponding fct
@@ -164,6 +202,7 @@ class AdversarialDetection():
         # Clf trained on only 2D data -> take the only two coefs
         self.m = (-1)*self.explainer.coef_[0] / self.explainer.coef_[1]
         self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
+
 
     def plot_results(self):
         """
@@ -224,7 +263,7 @@ def test():
 
     explainer = AdversarialDetection(X, clf=clf, chosen_attributes=chosen_attributes)
 
-    explainer.explain_instance(X_test[15], num_samples=600)
+    explainer.explain_instance(X_test[18], num_samples=600)
     explainer.plot_results()
 
 if __name__ == '__main__':
