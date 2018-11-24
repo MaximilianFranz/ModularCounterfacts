@@ -40,6 +40,7 @@ class analysis():
         self.ref_lime = self.predict(self.lime_m, self.lime_c, [instance[attr1], instance[attr2]])
         self.ref_own = self.predict(self.own_m, self.own_c, [instance[attr1], instance[attr2]])
         self.ref_ls = self.predict(self.ls_m, self.ls_c, [instance[attr1], instance[attr2]])
+        self.ref_adv = self.predict(self.adv_m, self.adv_c, [instance[attr1], instance[attr2]])
 
 
     def drawAll(self, attr1, attr2):
@@ -114,7 +115,8 @@ class analysis():
             coord4 = self.check(self.predict(self.lime_m, self.lime_c, [coord1, coord2]), self.ref_lime)
             coord5 = self.check(self.predict(self.own_m, self.own_c, [coord1, coord2]), self.ref_own)
             coord6 = self.check(self.predict(self.ls_m, self.ls_c, [coord1, coord2]), self.ref_ls)
-            self.sample.append([i, coord1, coord2, coord3, coord4, coord5, coord6])
+            coord7 = self.check(self.predict(self.adv_m, self.adv_c, [coord1, coord2]), self.ref_ls)
+            self.sample.append([i, coord1, coord2, coord3, coord4, coord5, coord6, coord7])
 
         #--- Visualize Attributspace
         yy = np.array(self.sample)[:,3]
@@ -122,7 +124,6 @@ class analysis():
             self.sample[i][3] = int(yy[i] >= 0.5)
         plt.scatter(np.array(self.sample)[:,1], np.array(self.sample)[:,2], c=['green'*int(self.sample[i][3])+'red'*(1-int(self.sample[i][3])) for i in range(0,len(self.sample))], cmap = plt.cm.Paired, marker='.', s=25)
         plt.scatter([self.instance[attr1]], [self.instance[attr2]], s=100, c='blue', marker='X')
-
 
         x_line = np.linspace(self.eval_range[0][0], self.eval_range[0][1], 100)
         y_line_lime = self.lime_m * x_line + self.lime_c
@@ -135,12 +136,18 @@ class analysis():
         plt.plot(x_line, y_line_adv, 'r-', lw=2)
         plt.xlabel("Attribut " + str(attr1))
         plt.ylabel("Attribut " + str(attr2))
-        plt.title("LIME (magenta); gg (cyan); ls (green)")
+        plt.title("LIME (magenta); gg (cyan); ls (green); adv (red)")
         plt.show()
+
+        lime = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 4]) / nsample
+        gg = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 5]) / nsample
+        ls = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 6]) / nsample
+        adv = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 7]) / nsample
+        self.accuracies = [lime, gg, ls]
 
         print(" ")
         print("Accuracy:")
-        print("LIME:   ", np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:,4]), " (", nsample, ")")
-        print("GG:     ", np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:,5]), " (", nsample, ")")
-        print("LS:     ", np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:,6]), " (", nsample, ")")
-        self.accuracies = [np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:,4])/nsample, np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:,5])/nsample, np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:,6])/nsample]
+        print("LIME:   ", lime , " (", nsample, ")")
+        print("GG:     ", gg ," (", nsample, ")")
+        print("LS:     ", ls, " (", nsample, ")")
+        print("Adv:     ", adv, " (", nsample, ")")

@@ -25,7 +25,6 @@ def finalEvaluation(jobs=103):
     clf = RandomForestClassifier(n_jobs=100, n_estimators=50, random_state=5000)
     clf.fit(X_train, Y_train)
 
-
     # --- Accuracy
     print("Accuracy:", accuracy_score(Y_test, clf.predict(X_test)))
     print("Report:\n", classification_report(Y_test, clf.predict(X_test)))
@@ -157,14 +156,15 @@ def finalEvaluation(jobs=103):
             explainer = AdversarialDetection(X, clf=clf, chosen_attributes=[attr1, attr2])
             explainer.explain_instance(X_test[i], num_samples=600)
             time2 = time.time()
-            dt_adv.append(time2-time1)
+            dt_adv.append(time2 - time1)
 
             # +------------------+
             # | gemeinsamer Plot |
             # +------------------+
             print('ana-start')
             ana = analysis.analysis(myexp.lime_m, myexp.lime_c, dec.svmQuick_m, dec.svmQuick_c, ls_exp.ls_m,
-                                    ls_exp.ls_c, explainer.m, explainer.b, attr1, attr2, myexp.mean, myexp.sigma, X_test[i], X_test, Y_test, clf,
+                                    ls_exp.ls_c, explainer.m, explainer.b, attr1, attr2, myexp.mean, myexp.sigma,
+                                    X_test[i], X_test, Y_test, clf,
                                     dec.eval_range)
             # ana.drawAll(attr1, attr2)
 

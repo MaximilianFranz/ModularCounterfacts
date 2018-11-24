@@ -14,11 +14,11 @@ from nelder_mead import nelder_mead
 
 import matplotlib.pyplot as plt
 from matplotlib import style
+
 style.use("ggplot")
 
 
 class AdversarialDetection():
-
     def __init__(self, X, clf, chosen_attributes=None):
         """
         X: the dataset
@@ -35,8 +35,6 @@ class AdversarialDetection():
 
         self.max_distance = np.linalg.norm(self.max_point - self.min_point)
 
-
-
     def load_data_txt(self, normalize=False):
         data = pd.read_csv("UCI_Credit_Card.csv")
 
@@ -48,20 +46,20 @@ class AdversarialDetection():
 
         return X, Y
 
-
     def get_border_touchpoints(self, support_points, original_instance, predictor_fn, fineness=5):
         """
         Uses a sort of binary search to find the border touchpoint on segments faster.
         """
         touchpoints = []
         for point in support_points:
+            print('point')
             # search on segment between point and original_instance with binary search
             l = 0
             r = 1
             for i in range(fineness):
-                m = (r + l)/ 2.0
-                x_m = original_instance + m*(point - original_instance)
-                if predictor_fn.predict_proba(np.array(x_m).reshape(1,-1))[0,1] <= 0.5:
+                m = (r + l) / 2.0
+                x_m = original_instance + m * (point - original_instance)
+                if predictor_fn.predict_proba(np.array(x_m).reshape(1, -1))[0, 1] <= 0.5:
                     l = m
                 else:
                     r = m
@@ -69,7 +67,6 @@ class AdversarialDetection():
 
         self.boundary_touchpoints = np.array(touchpoints)
         return self.boundary_touchpoints
-
 
     def sample_around(self, border_touchpoints, num_samples, sigma):
         """
@@ -84,16 +81,17 @@ class AdversarialDetection():
         min_arg = np.amin(border_touchpoints, axis=0)
         result = np.array(border_touchpoints)
         num_per_point = int(num_samples / len(border_touchpoints))
-        sigmas = (max_arg - min_arg)*sigma
+        sigmas = (max_arg - min_arg) * sigma
+        # Adjust sampling variance for attr 5, teswise
+        sigmas[5] = sigmas[5] * 5
         for point in border_touchpoints:
             mean = point
-            cov = np.diag(sigmas**2)
+            cov = np.diag(sigmas ** 2)
             rand = np.random.multivariate_normal(mean, cov, num_per_point)
             result = np.append(result, rand, axis=0)
 
         self.sample_set = result
         return self.sample_set
-
 
     def get_first_adversarial(self, original_instance):
         """
@@ -110,17 +108,17 @@ class AdversarialDetection():
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
 
-
     def adversarial_with_nelder_mead(self, instance):
         """
         Prepare functions to work with nelder_mead
         """
+
         def distance(A, B):
             """
             NOT USED
             distance normalized
             """
-            dist = np.linalg.norm(A-B) / self.max_distance**(0.1)
+            dist = np.linalg.norm(A - B) / self.max_distance ** (0.1)
             # dist = np.sqrt(np.exp(-(d**2) / 0.25**2))
             print(dist)
             return dist
@@ -131,7 +129,7 @@ class AdversarialDetection():
             X must be np.array
             """
 
-            return (1 - self.clf.predict_proba(X.reshape(1, -1))[0,1]) 
+            return (1 - self.clf.predict_proba(X.reshape(1, -1))[0, 1])
 
         return nelder_mead(func, instance)[0]
 
@@ -143,11 +141,19 @@ class AdversarialDetection():
         X = self.sample_set[:, self.chosen_attributes]
         y = self.predictions
         clf = Ridge(alpha=0.1)
-        clf.fit(X,y)
+        clf.fit(X, y)
         self.explainer = clf
         return self.explainer
 
-    def explain_instance(self, instance, num_samples=1000, locality=0.1, chosen_attributes=None):
+    def explain_instance(self,
+                         instance,
+                         num_samples=1000,
+                         locality=0.1,
+                         chosen_attributes=None,
+                         num_support=10,  # Magnetic Sampling variables
+                         confidence=5,
+                         threshold=2
+                         ):
         """
         Using the functions provided in this module this returns a linear
         """
@@ -157,38 +163,37 @@ class AdversarialDetection():
         # TODO: Make sure to handle cases without chosen_attributes accordingly
 
         one = time.time()
-        # self.first_adversarial = self.get_first_adversarial(instance)
-        self.first_adversarial = self.adversarial_with_nelder_mead(self.instance)
+        self.first_adversarial = self.get_first_adversarial(instance)
+        # self.first_adversarial = self.adversarial_with_nelder_mead(self.instance)
         two = time.time()
         print('adversarial time: ', two - one)
-
 
         # magnetic_sampling uses the predictor_fn not the predictor,
         # thus pass the corresponding fct
         one = time.time()
         self.support_points = self.ms.magnetic_sampling(self.clf.predict_proba,
-                                instance,
-                                self.first_adversarial,
-                                num_samples=5,
-                                features=self.chosen_attributes,
-                                sector_width=0.35,
-                                confidence=5,
-                                threshold=2
-                                )
+                                                        instance,
+                                                        self.first_adversarial,
+                                                        num_samples=num_support,
+                                                        features=self.chosen_attributes,
+                                                        sector_width=0.35,
+                                                        confidence=confidence,
+                                                        threshold=threshold
+                                                        )
         two = time.time()
         print('ms time: ', two - one)
 
         one = time.time()
         self.border_touchpoints = self.get_border_touchpoints(self.support_points,
-                                                    self.instance,
-                                                    self.clf,
-                                                    fineness=5)
+                                                              self.instance,
+                                                              self.clf,
+                                                              fineness=5)
         two = time.time()
         print('border_touchpoints time: ', two - one)
 
         one = time.time()
         self.sample_set = self.sample_around(self.border_touchpoints, num_samples, locality)
-        self.predictions = self.clf.predict_proba(self.sample_set)[:,1]
+        self.predictions = self.clf.predict_proba(self.sample_set)[:, 1]
         two = time.time()
         print('sample-predict time: ', two - one)
 
@@ -200,9 +205,8 @@ class AdversarialDetection():
         print('train explainer time: ', two - one)
 
         # Clf trained on only 2D data -> take the only two coefs
-        self.m = (-1)*self.explainer.coef_[0] / self.explainer.coef_[1]
+        self.m = (-1) * self.explainer.coef_[0] / self.explainer.coef_[1]
         self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
-
 
     def plot_results(self):
         """
@@ -219,7 +223,7 @@ class AdversarialDetection():
 
             print('exp pos: ', self.explainer_prediction[self.explainer_prediction > 0.5].size)
             score = self.explainer.score(self.sample_set[:, self.chosen_attributes], self.predictions)
-            print('score of explainer ', score )
+            print('score of explainer ', score)
 
             # generate colormap for predictions
             colors = []
@@ -228,7 +232,6 @@ class AdversarialDetection():
                     colors.append('limegreen')
                 else:
                     colors.append('tomato')
-
 
             # For brevity
             attr1 = self.chosen_attributes[0]
@@ -241,11 +244,13 @@ class AdversarialDetection():
             y_line = self.m * x_line + self.b
 
             # Plots
-            plt.scatter(self.sample_set[:, attr1], self.sample_set[:, attr2], c=colors, cmap = plt.cm.Paired, marker='.', s=25)
+            plt.scatter(self.sample_set[:, attr1], self.sample_set[:, attr2], c=colors, cmap=plt.cm.Paired, marker='.',
+                        s=25)
             plt.scatter([self.instance[attr1]], [self.instance[attr2]], s=100, c='blue', marker='X')
             plt.scatter([self.first_adversarial[attr1]], [self.first_adversarial[attr2]], s=100, c='red', marker='X')
             plt.scatter([self.support_points[:, attr1]], [self.support_points[:, attr2]], s=30, c='purple', marker='o')
-            plt.scatter([self.border_touchpoints[:, attr1]], [self.border_touchpoints[:, attr2]], s=100, c='black', marker='.')
+            plt.scatter([self.border_touchpoints[:, attr1]], [self.border_touchpoints[:, attr2]], s=100, c='black',
+                        marker='.')
             plt.plot(x_line, y_line, 'b-', lw=1)
             plt.xlabel("Attribut " + str(attr1))
             plt.ylabel("Attribut " + str(attr2))
@@ -254,8 +259,7 @@ class AdversarialDetection():
 
 
 def test():
-
-    chosen_attributes = [0,5]
+    chosen_attributes = [0, 5]
     clf = RandomForestClassifier(n_jobs=100, n_estimators=50, random_state=5000)
     X, Y = init.load_data_txt(normalize=False)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1000)
@@ -265,6 +269,7 @@ def test():
 
     explainer.explain_instance(X_test[18], num_samples=600)
     explainer.plot_results()
+
 
 if __name__ == '__main__':
     test()

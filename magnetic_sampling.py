@@ -8,11 +8,11 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from matplotlib import style
+
 style.use('ggplot')
 
 
 class MagneticSampler():
-
     def __init__(self, clf, scaler, sector_width=0.35, confidence=5, threshold=2):
         self.clf = clf
         self.scaler = scaler
@@ -20,20 +20,19 @@ class MagneticSampler():
         self.confidence = confidence
         self.threshold = threshold
 
-
     def ct(self, spherical):
         """ Tranforms spherical coordinates into a cartesian coordinate vector
 
         Args:
             spherical: radius, n-2 angles in [0, 2\pi] and the last angle in [0, pi]
         """
-        a = np.concatenate((np.array([2*np.pi]), spherical[1:]))
+        a = np.concatenate((np.array([2 * np.pi]), spherical[1:]))
         si = np.sin(a)
         si[0] = 1
         si = np.cumprod(si)
         co = np.cos(a)
         co = np.roll(co, -1)
-        return si*co*spherical[0]
+        return si * co * spherical[0]
 
     def inverse_ct(self, coords):
         """
@@ -89,29 +88,27 @@ class MagneticSampler():
 
         Returns:
         """
-        result = np.zeros((1,alphas_lower.size + 1))
+        result = np.zeros((1, alphas_lower.size + 1))
         radius_ranges = 1
         samples_per_range = num_samples / radius_ranges
-        radius = (radius_inner + radius_outer)/2
+        radius = (radius_inner + radius_outer) / 2
         for i in range(1, radius_ranges + 1):
             # radius = radius_inner + i/radius_ranges*(radius_outer - radius_inner)
             lower = np.append(np.array([radius]), alphas_lower)
             upper = np.append(np.array([radius]), alphas_upper)
             result = np.append(result,
-                            self.create_ranges(lower, upper, samples_per_range).T,
-                            axis=0)
+                               self.create_ranges(lower, upper, samples_per_range).T,
+                               axis=0)
 
         if restricted:
             restr = self.transform_set(result)
-            return self.adjust_features(original_instance, [0,5], restr)
+            return self.adjust_features(original_instance, [0, 5], restr)
         else:
             return self.transform_set(result) + original_instance
 
     def get_num_errors(self, samples, predictor_fn):
         """ Get number of 'wrong' predictions in a set of predictions
         """
-
-        # TODO: use multi-sample batch mode of predictor_fn!
 
         if self.scaler is None:
             trans_set = samples
@@ -134,12 +131,11 @@ class MagneticSampler():
 
         """
         if endpoint:
-            divisor = num-1
+            divisor = num - 1
         else:
             divisor = num
-        steps = (1.0/divisor) * (stop - start)
-        return steps[:,np.newaxis]*np.arange(num) + start[:,np.newaxis]
-
+        steps = (1.0 / divisor) * (stop - start)
+        return steps[:, np.newaxis] * np.arange(num) + start[:, np.newaxis]
 
     def adjust_features(self, instance, feature_positions, feature_updates, restricted_original):
         """
@@ -173,15 +169,15 @@ class MagneticSampler():
         # return np.array(result)
 
     def magnetic_sampling(self, predictor_fn,
-                        original_instance,
-                        adversarial_instance,
-                        num_samples,
-                        features,
-                        sector_depth=0.6, #must be set depending on the dataset
-                        sector_width=0.35, #About 20 degree,
-                        confidence=10, #must be set depending on the dataset
-                        threshold= 3,
-                        ):
+                          original_instance,
+                          adversarial_instance,
+                          num_samples,
+                          features,
+                          sector_depth=0.6,  # must be set depending on the dataset
+                          sector_width=0.35,  # About 20 degree,
+                          confidence=10,  # must be set depending on the dataset
+                          threshold=3,
+                          ):
         """
         magnetic_sampling implemented with restriction to a set of features
 
@@ -197,9 +193,8 @@ class MagneticSampler():
             the desired features with the new features created through magnetic_sampling
         """
         if self.scaler is not None:
-            original_instance = self.scaler.transform(original_instance.reshape(1,-1))[0]
-            adversarial_instance = self.scaler.transform(adversarial_instance.reshape(1,-1))[0]
-
+            original_instance = self.scaler.transform(original_instance.reshape(1, -1))[0]
+            adversarial_instance = self.scaler.transform(adversarial_instance.reshape(1, -1))[0]
 
         expand_right = True
         expand_left = True
@@ -223,7 +218,7 @@ class MagneticSampler():
         while expand_left or expand_right:
             if expand_left:
                 sampled_lower = self.sample_grid(confidence, radius_inner, radius_outer,
-                alphas_lower, alphas_lower + sector_width, restricted_original)
+                                                 alphas_lower, alphas_lower + sector_width, restricted_original)
 
                 adjusted = self.adjust_features(original_instance, features, sampled_lower, restricted_original)
                 errs = self.get_num_errors(adjusted, predictor_fn)
@@ -235,7 +230,7 @@ class MagneticSampler():
                     total_samples = np.append(total_samples, sampled_lower, axis=0)
             if expand_right:
                 sampled_upper = self.sample_grid(confidence, radius_inner, radius_outer,
-                alphas_upper - sector_width, alphas_upper, restricted_original)
+                                                 alphas_upper - sector_width, alphas_upper, restricted_original)
 
                 adjusted = self.adjust_features(original_instance, features, sampled_upper, restricted_original)
                 errs = self.get_num_errors(adjusted, predictor_fn)
@@ -244,8 +239,7 @@ class MagneticSampler():
                     expand_right = False
                 else:
                     alphas_upper = alphas_upper + sector_width
-                    total_samples= np.append(total_samples, sampled_upper, axis=0)
-
+                    total_samples = np.append(total_samples, sampled_upper, axis=0)
 
         total_samples = self.adjust_features(original_instance, features, total_samples, restricted_original)
 
@@ -254,7 +248,7 @@ class MagneticSampler():
         if diff > 0:
             # To few samples are drawn
             additional_samples = self.sample_grid(abs(diff), radius_inner, radius_outer,
-             alphas_lower, alphas_upper, restricted_original)
+                                                  alphas_lower, alphas_upper, restricted_original)
             adjusted = self.adjust_features(original_instance, features, additional_samples, restricted_original)
             total_samples = np.append(total_samples, adjusted, axis=0)
 
