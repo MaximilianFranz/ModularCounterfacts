@@ -1,14 +1,14 @@
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, lars_path
+from sklearn.tree import DecisionTreeClassifier,
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
 import gradientgrow
 import init
 import time
-import copy
+from graph_export import export_tree
 from magnetic_sampling import MagneticSampler
 from nelder_mead import nelder_mead
 
@@ -108,7 +108,7 @@ class AdversarialDetection():
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
 
-    def adversarial_with_nelder_mead(self, instance):
+    def adversarial_with_nelder_mead(self, instance, target_value=1):
         """
         Prepare functions to work with nelder_mead
         """
@@ -129,7 +129,7 @@ class AdversarialDetection():
             X must be np.array
             """
 
-            return (1 - self.clf.predict_proba(X.reshape(1, -1))[0, 1])
+            return (target_value - self.clf.predict_proba(X.reshape(1, -1))[0, 1])
 
         return nelder_mead(func, instance)[0]
 
@@ -145,6 +145,68 @@ class AdversarialDetection():
         self.explainer = clf
         return self.explainer
 
+    @staticmethod
+    def get_primary_features(data, labels, num_features):
+        """ Returns most relevant *num_features* features using lars_path
+
+
+        Args:
+            data: the training data
+            labels: labels for training.
+            num_features: Number of features desired
+
+        Returns:
+            used_features: list of indizes of the relevant features in the data
+        """
+        _, _, coefs = lars_path(data,
+                                labels,
+                                method='lasso',
+                                verbose=False)
+
+        for i in range(len(coefs.T) - 1, 0, -1):
+            nonzero = coefs.T[i].nonzero()[0]
+            if len(nonzero) <= num_features:
+                break
+        used_features = nonzero
+
+        return used_features
+
+    def explain_auto(self, instance, num_features, num_samples=1000, locality=0.1, num_support=10, confidence=5, threshold=2):
+        """
+        1. Seek decision boundary with nelder_mead or similar optimization
+        2. Find most relevant features with lars path
+        3. Train decision tree on those features
+
+        Returns:
+
+        """
+
+        self.instance = instance
+        self.first_adversarial = self.adversarial_with_nelder_mead(self.instance)
+        self.support_points = self.ms.magnetic_sampling(self.clf.predict_proba,
+                                                        instance,
+                                                        self.first_adversarial,
+                                                        num_samples=num_support,
+                                                        features=self.chosen_attributes,
+                                                        sector_width=0.35,
+                                                        confidence=confidence,
+                                                        threshold=threshold
+                                                        )
+        self.border_touchpoints = self.get_border_touchpoints(self.support_points,
+                                                              self.instance,
+                                                              self.clf,
+                                                              fineness=5)
+        self.sample_set = self.sample_around(self.border_touchpoints, num_samples, locality)
+        self.predictions = self.clf.predict_proba(self.sample_set)[:, 1]
+
+        features = self.get_primary_features(self.sample_set, self.predictions, num_features)
+        print('used features: ', features)
+        tree = DecisionTreeClassifier(max_depth=len(features) + 1)  # allow one split-level per feature
+        self.predictions = np.round(self.predictions)
+        print('labels: ', self.predictions)
+        tree.fit(self.sample_set[:, features], self.predictions)
+        export_tree(tree, 'tree.pdf')
+
     def explain_instance(self,
                          instance,
                          num_samples=1000,
@@ -155,7 +217,10 @@ class AdversarialDetection():
                          threshold=2
                          ):
         """
-        Using the functions provided in this module this returns a linear
+        Using the functions provided in this module this returns a linear approximation of the decision boundary
+        closest to the instance.
+
+        This is restricted to 2 dimnesions in chosen_attributes, because it uses GradientGrow
         """
         self.instance = instance
         if chosen_attributes is not None:
@@ -207,6 +272,7 @@ class AdversarialDetection():
         # Clf trained on only 2D data -> take the only two coefs
         self.m = (-1) * self.explainer.coef_[0] / self.explainer.coef_[1]
         self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
+        return self.explainer
 
     def plot_results(self):
         """
@@ -267,9 +333,10 @@ def test():
 
     explainer = AdversarialDetection(X, clf=clf, chosen_attributes=chosen_attributes)
 
-    explainer.explain_instance(X_test[18], num_samples=600)
-    explainer.plot_results()
+    # explainer.explain_instance(X_test[18], num_samples=600)
+    # explainer.plot_results()
 
+    explainer.explain_auto(X_test[33], 6)
 
 if __name__ == '__main__':
     test()
