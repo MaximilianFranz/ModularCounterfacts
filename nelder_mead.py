@@ -2,7 +2,7 @@ import numpy as np
 import math
 import copy
 
-def nelder_mead(self, f, x_start,
+def nelder_mead(f, x_start,
                 step=10, no_improve_thr=10e-8,
                 no_improv_break=10, max_iter=0,
                 alpha=2., gamma=2., rho=-0.5, sigma=0.5):
