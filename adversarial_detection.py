@@ -1,19 +1,21 @@
-from sklearn.linear_model import Ridge, lars_path
-from sklearn.tree import DecisionTreeClassifier,
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
+import time
 import numpy as np
 import pandas as pd
-import gradientgrow
-import init
-import time
-from graph_export import export_tree
-from magnetic_sampling import MagneticSampler
-from nelder_mead import nelder_mead
 
 import matplotlib.pyplot as plt
 from matplotlib import style
+
+from sklearn.linear_model import Ridge, lars_path
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+
+import gradientgrow
+import init
+from graph_export import export_tree
+from magnetic_sampling import MagneticSampler
+from nelder_mead import nelder_mead
 
 style.use("ggplot")
 
