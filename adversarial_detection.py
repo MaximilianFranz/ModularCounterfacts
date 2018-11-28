@@ -10,12 +10,13 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
+from scipy.optimize import minimize
 
 import gradientgrow
 import init
 from graph_export import export_tree
 from magnetic_sampling import MagneticSampler
-from nelder_mead import nelder_mead
+from nelder_mead import nelder_mead, func, distance_function
 
 style.use("ggplot")
 
@@ -85,7 +86,7 @@ class AdversarialDetection():
         num_per_point = int(num_samples / len(border_touchpoints))
         sigmas = (max_arg - min_arg) * sigma
         # Adjust sampling variance for attr 5, teswise
-        sigmas[5] = sigmas[5] * 5
+        # sigmas[5] = sigmas[5] * 5
         for point in border_touchpoints:
             mean = point
             cov = np.diag(sigmas ** 2)
@@ -109,6 +110,25 @@ class AdversarialDetection():
         self.gradientGrow = dec
         self.first_adversarial = dec.get_last_instance()
         return self.first_adversarial
+
+    def adversarial_with_minimize(self, instance, target_value=1):
+        """
+        Attempts to use general minization to find adversarial.
+        'DOES NOT WORK': With nelder-mead this returns an instance that is
+        of the adversarial class, but magnetic_sampling is not able to draw
+        samples around it, because it seems to find outlier adversarials rather
+        than a robust area.
+        """
+        d = distance_function(instance)
+        f = func(target_value, self.clf, d, 0.000000001, scaler=self.scaler)
+        delta = np.random.rand(len(instance))
+        t_inst = self.scaler.transform(instance.reshape(1,-1))
+        print('old ', f(t_inst))
+        res = minimize(f, t_inst, method="nelder-mead")
+        print('new ', f(res.x))
+        print(self.scaler.inverse_transform(res.x))
+        return self.scaler.inverse_transform(res.x)
+
 
     def adversarial_with_nelder_mead(self, instance, target_value=1):
         """
@@ -175,11 +195,13 @@ class AdversarialDetection():
 
     def explain_auto(self, instance, num_features, num_samples=1000, locality=0.1, num_support=10, confidence=5, threshold=2):
         """
-        1. Seek decision boundary with nelder_mead or similar optimization
-        2. Find most relevant features with lars path
-        3. Train decision tree on those features
+        Using different subprocedures this returns a tree-based explanation of the instance
 
-        Returns:
+        Writes to file 'tree.pdf'
+        Procedure:
+            1. Seek decision boundary with nelder_mead and magnetic_sampling
+            2. Find most relevant features with lars path
+            3. Train decision tree on those features
 
         """
 
@@ -335,10 +357,10 @@ def test():
 
     explainer = AdversarialDetection(X, clf=clf, chosen_attributes=chosen_attributes)
 
-    # explainer.explain_instance(X_test[18], num_samples=600)
-    # explainer.plot_results()
+    explainer.explain_instance(X_test[18], num_samples=600)
+    explainer.plot_results()
 
-    explainer.explain_auto(X_test[33], 6)
+    # explainer.explain_auto(X_test[18], 6)
 
 if __name__ == '__main__':
     test()

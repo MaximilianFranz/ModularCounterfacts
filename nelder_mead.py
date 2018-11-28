@@ -2,6 +2,25 @@ import numpy as np
 import math
 import copy
 
+
+def distance_function(instance):
+            """
+            NOT USED
+            distance normalized
+            """
+            # dist = np.sqrt(np.exp(-(d**2) / 0.25**2))
+            return lambda X: np.linalg.norm(X - instance)
+
+def func(target_value, clf, d, beta, scaler=None):
+            """
+            Returns the function to optimize
+            X must be np.array
+            """
+            if scaler is not None:
+                return lambda X : (target_value - clf.predict_proba(scaler.inverse_transform(X.reshape(1,-1)).reshape(1, -1))[0, 1])**(1/3) #+ beta*d(X)
+
+
+
 def nelder_mead(f, x_start,
                 step=10, no_improve_thr=10e-8,
                 no_improv_break=10, max_iter=0,
