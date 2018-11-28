@@ -202,67 +202,76 @@ class MagneticSampler():
         restricted_original = original_instance[features]
         restricted_adversarial = adversarial_instance[features]
 
-        # Prep parameters
-        # Note that we work on a distorted space, because we look at the vector between
-        # original instance and adversarial_instance, before clf we must redo this step.
+        found = False
         distance = np.linalg.norm(restricted_adversarial - restricted_original)
-        print('distance', distance)
-        radius_inner = distance - sector_depth / 2
-        radius_outer = distance + sector_depth / 2
-        alphas = np.array([self.inverse_ct(restricted_adversarial - restricted_original)[1:]])
-        alphas_lower = alphas - sector_width
-        alphas_upper = alphas + sector_width
 
-        # start original sample
-        total_samples = np.zeros((1, restricted_original.size))
-        while expand_left or expand_right:
-            if expand_left:
-                sampled_lower = self.sample_grid(confidence, radius_inner, radius_outer,
-                                                 alphas_lower, alphas_lower + sector_width, restricted_original)
+        while not found:
+            # Prep parameters
+            # Note that we work on a distorted space, because we look at the vector between
+            # original instance and adversarial_instance, before clf we must redo this step.
+            print('distance', distance)
+            radius_inner = distance - sector_depth / 2
+            radius_outer = distance + sector_depth / 2
+            alphas = np.array([self.inverse_ct(restricted_adversarial - restricted_original)[1:]])
+            alphas_lower = alphas - sector_width
+            alphas_upper = alphas + sector_width
 
-                adjusted = self.adjust_features(original_instance, features, sampled_lower, restricted_original)
-                errs = self.get_num_errors(adjusted, predictor_fn)
+            # start original sample
+            total_samples = np.zeros((1, restricted_original.size))
+            while expand_left or expand_right:
+                if expand_left:
+                    sampled_lower = self.sample_grid(confidence, radius_inner, radius_outer,
+                                                     alphas_lower, alphas_lower + sector_width, restricted_original)
 
-                if errs > threshold:
-                    expand_left = False
-                else:
-                    alphas_lower = alphas_lower - sector_width
-                    total_samples = np.append(total_samples, sampled_lower, axis=0)
-            if expand_right:
-                sampled_upper = self.sample_grid(confidence, radius_inner, radius_outer,
-                                                 alphas_upper - sector_width, alphas_upper, restricted_original)
+                    adjusted = self.adjust_features(original_instance, features, sampled_lower, restricted_original)
+                    errs = self.get_num_errors(adjusted, predictor_fn)
 
-                adjusted = self.adjust_features(original_instance, features, sampled_upper, restricted_original)
-                errs = self.get_num_errors(adjusted, predictor_fn)
+                    if errs > threshold:
+                        expand_left = False
+                    else:
+                        alphas_lower = alphas_lower - sector_width
+                        total_samples = np.append(total_samples, sampled_lower, axis=0)
+                if expand_right:
+                    sampled_upper = self.sample_grid(confidence, radius_inner, radius_outer,
+                                                     alphas_upper - sector_width, alphas_upper, restricted_original)
 
-                if errs > threshold:
-                    expand_right = False
-                else:
-                    alphas_upper = alphas_upper + sector_width
-                    total_samples = np.append(total_samples, sampled_upper, axis=0)
+                    adjusted = self.adjust_features(original_instance, features, sampled_upper, restricted_original)
+                    errs = self.get_num_errors(adjusted, predictor_fn)
 
-        total_samples = self.adjust_features(original_instance, features, total_samples, restricted_original)
+                    if errs > threshold:
+                        expand_right = False
+                    else:
+                        alphas_upper = alphas_upper + sector_width
+                        total_samples = np.append(total_samples, sampled_upper, axis=0)
 
-        diff = num_samples - total_samples.shape[0]
-        print('diff: ', diff)
-        if diff > 0:
-            # To few samples are drawn
-            additional_samples = self.sample_grid(abs(diff), radius_inner, radius_outer,
-                                                  alphas_lower, alphas_upper, restricted_original)
-            adjusted = self.adjust_features(original_instance, features, additional_samples, restricted_original)
-            total_samples = np.append(total_samples, adjusted, axis=0)
+            total_samples = self.adjust_features(original_instance, features, total_samples, restricted_original)
 
-        # Remove edge cases where a negative sample was drawn
-        cleaned_samples = self.clean(total_samples, predictor_fn)
+            diff = num_samples - total_samples.shape[0]
+            print('diff: ', diff)
+            if diff > 0:
+                # To few samples are drawn
+                additional_samples = self.sample_grid(abs(diff), radius_inner, radius_outer,
+                                                      alphas_lower, alphas_upper, restricted_original)
+                adjusted = self.adjust_features(original_instance, features, additional_samples, restricted_original)
+                total_samples = np.append(total_samples, adjusted, axis=0)
 
-        diff = num_samples - cleaned_samples.shape[0]
+            # Remove edge cases where a negative sample was drawn
+            cleaned_samples = self.clean(total_samples, predictor_fn)
 
-        if diff < 0:
-            take = np.random.choice(len(cleaned_samples), num_samples)
-            cleaned_samples = cleaned_samples[take]
+            diff = num_samples - cleaned_samples.shape[0]
 
-        print('TOTAL-SHAPE:', total_samples.shape)
-        print('CLEAN-SHAPE:', cleaned_samples.shape)
+            if diff < 0:
+                take = np.random.choice(len(cleaned_samples), num_samples)
+                cleaned_samples = cleaned_samples[take]
+
+            print('TOTAL-SHAPE:', total_samples.shape)
+            print('CLEAN-SHAPE:', cleaned_samples.shape)
+
+            if cleaned_samples.shape[0] > 0:
+                found = True
+            else:
+                distance = distance*2
+
 
         if self.scaler is not None:
             return self.scaler.inverse_transform(cleaned_samples)
