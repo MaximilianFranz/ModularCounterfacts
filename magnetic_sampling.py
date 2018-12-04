@@ -8,64 +8,30 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from matplotlib import style
+from utils import ct, transform_set, inverse_ct, create_ranges, adjust_features
 
 style.use('ggplot')
 
 
 class MagneticSampler():
     def __init__(self, clf, scaler, sector_width=0.35, confidence=5, threshold=2):
+        """
+        Constructor of MagneticSampler
+        Args:
+            clf: black-box classifier trained on data
+            scaler: StandardScaler already fit to data
+            sector_width: angle in radians in which to sample per sector
+            confidence: number of instances sampled in sector
+            threshold: number of instances before aborting due to too many errors
+        """
         self.clf = clf
         self.scaler = scaler
         self.sector_width = sector_width
         self.confidence = confidence
         self.threshold = threshold
 
-    def ct(self, spherical):
-        """ Tranforms spherical coordinates into a cartesian coordinate vector
-
-        Args:
-            spherical: radius, n-2 angles in [0, 2\pi] and the last angle in [0, pi]
-        """
-        a = np.concatenate((np.array([2 * np.pi]), spherical[1:]))
-        si = np.sin(a)
-        si[0] = 1
-        si = np.cumprod(si)
-        co = np.cos(a)
-        co = np.roll(co, -1)
-        return si * co * spherical[0]
-
-    def inverse_ct(self, coords):
-        """
-        Tranforms cartesian coordinates into spherical coordinates.
-
-        Naive algorithmic implementation. TODO: Replace with numpy implementation.
-
-        Args:
-            coords: Array of cartesian coordinates
-
-        Return:
-            alphas: Array of spherical coordinates where the first element is the radius
-        """
-        radius = np.linalg.norm(coords)
-
-        alphas = [radius]
-        for i in range(0, len(coords) - 1):
-            arcos = np.arccos(coords[i] / np.linalg.norm(coords[i:]))
-            alphas.append(arcos)
-
-        return alphas
-
-    def transform_set(self, samples):
-        """
-        Tranforms an array of vectors from spherical to cartesian coords
-        """
-        result = []
-        for s in samples:
-            result.append(self.ct(s))
-
-        return result
-
-    def sample_grid(self,
+    @staticmethod
+    def sample_grid(
                     num_samples,
                     radius_inner,
                     radius_outer,
@@ -97,16 +63,16 @@ class MagneticSampler():
             lower = np.append(np.array([radius]), alphas_lower)
             upper = np.append(np.array([radius]), alphas_upper)
             result = np.append(result,
-                               self.create_ranges(lower, upper, samples_per_range).T,
+                               create_ranges(lower, upper, samples_per_range).T,
                                axis=0)
 
         if restricted:
-            restr = self.transform_set(result)
-            return self.adjust_features(original_instance, [0, 5], restr)
+            restr = transform_set(result)
+            return adjust_features(original_instance, [0, 5], restr)
         else:
-            return self.transform_set(result) + original_instance
+            return transform_set(result) + original_instance
 
-    def get_num_errors(self, samples, predictor_fn):
+    def get_num_errors(self, samples):
         """ Get number of 'wrong' predictions in a set of predictions
         """
 
@@ -118,39 +84,7 @@ class MagneticSampler():
         results = self.clf.predict_proba(trans_set)[:, 1]
         return results[results <= 0.5].size
 
-    def create_ranges(self, start, stop, num, endpoint=True):
-        """
-        Helper method to generate linspace for multiple start and endpoints
-
-        Args:
-            start: start points for the intervals
-            stop: stop points for the intervals
-            num: number of steps between the single start and stop points
-            endpoint: Whether to include the endpoint in the interval
-        Returns:
-
-        """
-        if endpoint:
-            divisor = num - 1
-        else:
-            divisor = num
-        steps = (1.0 / divisor) * (stop - start)
-        return steps[:, np.newaxis] * np.arange(num) + start[:, np.newaxis]
-
-    def adjust_features(self, instance, feature_positions, feature_updates, restricted_original):
-        """
-        Given a complete instance feature vector this method adjusts only the
-        features at the specified positions by adding the specified feature_updates
-        and creating an array of complete feature vectors with the different changes
-
-
-        Also transposes the vector back to it position in the original space
-        """
-        result = np.full((feature_updates.shape[0], instance.size), instance)
-        result[:, feature_positions] = feature_updates
-        return result
-
-    def clean(self, samples, predictor_fn):
+    def clean(self, samples):
         if self.scaler is None:
             trans_set = samples
         else:
@@ -161,14 +95,7 @@ class MagneticSampler():
         result = samples[pos_res_ind]
         return result
 
-        # result = []
-        # for sample in samples:
-        #     if predictor_fn(sample.reshape(1,-1))[0,1] > 0.5:
-        #         result.append(sample)
-        #
-        # return np.array(result)
-
-    def magnetic_sampling(self, predictor_fn,
+    def magnetic_sampling(self,
                           original_instance,
                           adversarial_instance,
                           num_samples,
@@ -184,9 +111,14 @@ class MagneticSampler():
         All non-selected features remain fixed
 
         Args:
-            See magnetic_sampling
-            features: list of feature positions in the feature vectors that ought
-            to be used.
+            original_instance:
+            adversarial_instance:
+            num_samples:
+            features: list of feature positions in the feature vectors that ought to be used.
+            sector_depth:
+            sector_width:
+            confidence:
+            threshold:
 
         Returns:
             Full instnances created by updating copies of the original_instance at
@@ -207,12 +139,12 @@ class MagneticSampler():
 
         while not found:
             # Prep parameters
-            # Note that we work on a distorted space, because we look at the vector between
+            # Note that we work on a transposed space, because we look at the vector between
             # original instance and adversarial_instance, before clf we must redo this step.
             print('distance', distance)
             radius_inner = distance - sector_depth / 2
             radius_outer = distance + sector_depth / 2
-            alphas = np.array([self.inverse_ct(restricted_adversarial - restricted_original)[1:]])
+            alphas = np.array([inverse_ct(restricted_adversarial - restricted_original)[1:]])
             alphas_lower = alphas - sector_width
             alphas_upper = alphas + sector_width
 
@@ -223,28 +155,28 @@ class MagneticSampler():
                     sampled_lower = self.sample_grid(confidence, radius_inner, radius_outer,
                                                      alphas_lower, alphas_lower + sector_width, restricted_original)
 
-                    adjusted = self.adjust_features(original_instance, features, sampled_lower, restricted_original)
-                    errs = self.get_num_errors(adjusted, predictor_fn)
+                    adjusted = adjust_features(original_instance, features, sampled_lower, restricted_original)
+                    errs = self.get_num_errors(adjusted)
 
                     if errs > threshold:
                         expand_left = False
                     else:
-                        alphas_lower = alphas_lower - sector_width
+                        alphas_lower -= sector_width
                         total_samples = np.append(total_samples, sampled_lower, axis=0)
                 if expand_right:
                     sampled_upper = self.sample_grid(confidence, radius_inner, radius_outer,
                                                      alphas_upper - sector_width, alphas_upper, restricted_original)
 
-                    adjusted = self.adjust_features(original_instance, features, sampled_upper, restricted_original)
-                    errs = self.get_num_errors(adjusted, predictor_fn)
+                    adjusted = adjust_features(original_instance, features, sampled_upper, restricted_original)
+                    errs = self.get_num_errors(adjusted)
 
                     if errs > threshold:
                         expand_right = False
                     else:
-                        alphas_upper = alphas_upper + sector_width
+                        alphas_upper += sector_width
                         total_samples = np.append(total_samples, sampled_upper, axis=0)
 
-            total_samples = self.adjust_features(original_instance, features, total_samples, restricted_original)
+            total_samples = adjust_features(original_instance, features, total_samples, restricted_original)
 
             diff = num_samples - total_samples.shape[0]
             print('diff: ', diff)
@@ -252,11 +184,11 @@ class MagneticSampler():
                 # To few samples are drawn
                 additional_samples = self.sample_grid(abs(diff), radius_inner, radius_outer,
                                                       alphas_lower, alphas_upper, restricted_original)
-                adjusted = self.adjust_features(original_instance, features, additional_samples, restricted_original)
+                adjusted = adjust_features(original_instance, features, additional_samples, restricted_original)
                 total_samples = np.append(total_samples, adjusted, axis=0)
 
             # Remove edge cases where a negative sample was drawn
-            cleaned_samples = self.clean(total_samples, predictor_fn)
+            cleaned_samples = self.clean(total_samples)
 
             diff = num_samples - cleaned_samples.shape[0]
 
@@ -270,9 +202,10 @@ class MagneticSampler():
             if cleaned_samples.shape[0] > 0:
                 found = True
             else:
-                distance = distance*2
+                distance *= 2
 
 
         if self.scaler is not None:
             return self.scaler.inverse_transform(cleaned_samples)
+
         return cleaned_samples
