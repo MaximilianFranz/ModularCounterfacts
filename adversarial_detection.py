@@ -106,6 +106,7 @@ class AdversarialDetection():
                                     self.chosen_attributes,
                                     original_instance,
                                     self.clf)
+        # TODO: Automate Parameters
         dec.gradient_search(step=0.05, scale=1.0, nsample=100)
         self.gradientGrow = dec
         self.first_adversarial = dec.get_last_instance()
@@ -162,6 +163,7 @@ class AdversarialDetection():
         """
         X = self.sample_set[:, self.chosen_attributes]
         y = self.predictions
+        # TODO: Automate Parameters
         clf = Ridge(alpha=0.1)
         clf.fit(X, y)
         self.explainer = clf
@@ -193,6 +195,7 @@ class AdversarialDetection():
 
         return used_features
 
+    # TODO: Automate Parameters based on dataset and inter-parameter relations (e.g. confidence & threshold)
     def explain_auto(self, instance, num_features, num_samples=1000, locality=0.1, num_support=10, confidence=5, threshold=2):
         """
         Using different subprocedures this returns a tree-based explanation of the instance
@@ -206,7 +209,8 @@ class AdversarialDetection():
         """
 
         self.instance = instance
-        self.first_adversarial = self.adversarial_with_nelder_mead(self.instance)
+        self.first_adversarial = self.adversarial_with_minimize(self.instance)
+        # TODO: Automate Parameters
         self.support_points = self.ms.magnetic_sampling(self.clf.predict_proba,
                                                         instance,
                                                         self.first_adversarial,
@@ -231,6 +235,7 @@ class AdversarialDetection():
         tree.fit(self.sample_set[:, features], self.predictions)
         export_tree(tree, 'tree.pdf')
 
+    # TODO: Automate Parameters based on dataset and inter-parameter relations (e.g. confidence & threshold)
     def explain_instance(self,
                          instance,
                          num_samples=1000,
@@ -249,7 +254,6 @@ class AdversarialDetection():
         self.instance = instance
         if chosen_attributes is not None:
             self.chosen_attributes = chosen_attributes
-        # TODO: Make sure to handle cases without chosen_attributes accordingly
 
         one = time.time()
         self.first_adversarial = self.get_first_adversarial(instance)
@@ -357,10 +361,10 @@ def test():
 
     explainer = AdversarialDetection(X, clf=clf, chosen_attributes=chosen_attributes)
 
-    explainer.explain_instance(X_test[18], num_samples=600)
-    explainer.plot_results()
+    # explainer.explain_instance(X_test[18], num_samples=600)
+    # explainer.plot_results()
 
-    # explainer.explain_auto(X_test[18], 6)
+    explainer.explain_auto(X_test[18], 6)
 
 if __name__ == '__main__':
     test()

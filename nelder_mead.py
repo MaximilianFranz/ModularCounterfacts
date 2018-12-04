@@ -1,5 +1,7 @@
+"""
+Native Nelder-Mead implementation and helper methods to construct a function to minimize in the context of boundary detection
+"""
 import numpy as np
-import math
 import copy
 
 
@@ -17,7 +19,7 @@ def func(target_value, clf, d, beta, scaler=None):
             X must be np.array
             """
             if scaler is not None:
-                return lambda X : (target_value - clf.predict_proba(scaler.inverse_transform(X.reshape(1,-1)).reshape(1, -1))[0, 1])**(1/3) #+ beta*d(X)
+                return lambda X: (target_value - clf.predict_proba(scaler.inverse_transform(X.reshape(1,-1)).reshape(1, -1))[0, 1])**(1/3) #+ beta*d(X)
 
 
 

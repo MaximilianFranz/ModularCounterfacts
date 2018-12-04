@@ -1,3 +1,6 @@
+"""
+Helper functions to export trees as pdf
+"""
 from sklearn.tree import export_graphviz
 import pydotplus
 
