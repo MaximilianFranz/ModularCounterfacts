@@ -37,6 +37,7 @@ class AdversarialDetection():
         self.min_point = np.amin(X, axis=0)
 
         self.max_distance = np.linalg.norm(self.max_point - self.min_point)
+        self.eval_range = []
 
     def load_data_txt(self, normalize=False):
         data = pd.read_csv("UCI_Credit_Card.csv")
@@ -82,6 +83,7 @@ class AdversarialDetection():
         """
         max_arg = np.amax(border_touchpoints, axis=0)
         min_arg = np.amin(border_touchpoints, axis=0)
+        self.eval_range = np.array([min_arg[self.chosen_attributes], max_arg[self.chosen_attributes]]).T
         result = np.array(border_touchpoints)
         num_per_point = int(num_samples / len(border_touchpoints))
         sigmas = (max_arg - min_arg) * sigma
@@ -264,7 +266,7 @@ class AdversarialDetection():
         # magnetic_sampling uses the predictor_fn not the predictor,
         # thus pass the corresponding fct
         one = time.time()
-        self.support_points = self.ms.magnetic_sampling(self.clf.predict_proba,
+        self.support_points = self.ms.magnetic_sampling(
                                                         instance,
                                                         self.first_adversarial,
                                                         num_samples=num_support,
