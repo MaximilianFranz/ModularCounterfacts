@@ -8,7 +8,7 @@ style.use("ggplot")
 
 
 class analysis():
-    def __init__(self, m1, c1, m2, c2, m3, c3, m4, c4, attr1, attr2, mean, sigma, instance, X_test, Y_test, clf, eval_range):
+    def __init__(self, m1, c1, m2, c2, m3, c3, m4, c4, attr1, attr2, mean, sigma, instance, X_test, Y_test, clf, eval_range, direct=False, use_mce=True):
         #--- Parameter für die Entscheidungsgrenzen
         self.lime_m = m1*sigma[attr2]/sigma[attr1]
         self.lime_c = mean[attr2] + c1*sigma[attr2] - m1*mean[attr1]*sigma[attr2]/sigma[attr1]
@@ -19,12 +19,27 @@ class analysis():
         self.adv_m = m4*sigma[attr2]/sigma[attr1]
         self.adv_c = mean[attr2] + c4*sigma[attr2] - m4*mean[attr1]*sigma[attr2]/sigma[attr1]
         self.instance = instance
+
+        # Whether or not to use MCE in plot
+        self.use_mce = use_mce
+
         #--- Daten und trainiertes Modell
         self.x = X_test
         self.y = Y_test
         self.clf = clf
+        #--- Evaluierungsbereich bestimmen
+        if direct:
+            self.eval_range = eval_range
+        else:
+            xxx = []
+            yyy = []
+            for i in range(0,int(len(eval_range)/2)):
+                xxx.append(eval_range[2*i])
+                yyy.append(eval_range[2*i+1])
+            yyy = np.array(yyy)
+            xxx = np.array(xxx)
+            self.eval_range = np.array([[np.min(xxx), np.max(xxx)], [np.min(yyy), np.max(yyy)]])
 
-        self.eval_range = eval_range
         #--- Referenzwerte (welche Seite von den Geraden ist als 0 klassifiziert)
         self.ref_lime = self.predict(self.lime_m, self.lime_c, [instance[attr1], instance[attr2]])
         self.ref_own = self.predict(self.own_m, self.own_c, [instance[attr1], instance[attr2]])
@@ -122,7 +137,8 @@ class analysis():
         plt.plot(x_line, y_line_lime, 'm-', lw=2)
         plt.plot(x_line, y_line_own, 'c-', lw=2)
         plt.plot(x_line, y_line_ls, 'g-', lw=2)
-        plt.plot(x_line, y_line_adv, 'r-', lw=2)
+        if self.use_mce:
+            plt.plot(x_line, y_line_adv, 'r-', lw=2)
         plt.xlabel("Attribut " + str(attr1))
         plt.ylabel("Attribut " + str(attr2))
         plt.title("LIME (magenta); gg (cyan); ls (green); adv (red)")
@@ -131,7 +147,9 @@ class analysis():
         lime = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 4]) / nsample
         gg = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 5]) / nsample
         ls = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 6]) / nsample
-        adv = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 7]) / nsample
+        if self.use_mce:
+            adv = np.sum(np.array(self.sample)[:,3] == np.array(self.sample)[:, 7]) / nsample
+
         self.accuracies = [lime, gg, ls]
 
         print(" ")
@@ -139,4 +157,6 @@ class analysis():
         print("LIME:   ", lime , " (", nsample, ")")
         print("GG:     ", gg ," (", nsample, ")")
         print("LS:     ", ls, " (", nsample, ")")
-        print("Adv:     ", adv, " (", nsample, ")")
+
+        if self.use_mce:
+            print("Adv:     ", adv, " (", nsample, ")")
