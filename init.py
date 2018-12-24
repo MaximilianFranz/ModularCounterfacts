@@ -7,12 +7,13 @@ from matplotlib import style
 style.use("ggplot")
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.datasets import load_iris, load_breast_cancer
 
 
 #--- Credit Daten aus CSV-Datei lesen
 def load_data_txt(normalize=False):
     #--- Load data from txt-file
-    data = pd.read_csv("UCI_Credit_Card.csv")
+    data = pd.read_csv("data/UCI_Credit_Card.csv")
 
     Y = np.array(data.pop("default.payment.next.month"))
     data.pop("ID")
@@ -22,6 +23,45 @@ def load_data_txt(normalize=False):
 
     return X, Y
 
+
+def load_data_iris():
+    """
+    Dataset is adapted to display a binary decision between versicolor and not-versicolor (or class 2 or not-class-2)
+    Returns:
+
+    """
+    X, Y = load_iris(return_X_y=True)
+    for i in range(0, len(Y)):
+        if Y[i] == 1:
+            Y[i] = 0
+    for i in range(0, len(Y)):
+        if Y[i] == 2:
+            Y[i] = 1
+
+    return X, Y
+
+
+def load_data_breast_cancer():
+    X, Y = load_breast_cancer(return_X_y=True)
+
+    return X, Y
+
+
+def load_data_survival():
+    url = "data/haberman.csv"
+    names = ['Age', 'Year operation', 'Axillary nodes detected', 'Survival status']
+    data = pd.read_csv(url, names=names)
+
+    Y = np.array(data.pop('Survival status'))
+    X = np.array(data)
+    for i in range(0, len(Y)):
+        if Y[i] == 1:
+            Y[i] = 0
+    for i in range(0, len(Y)):
+        if Y[i] == 2:
+            Y[i] = 1
+
+    return X, Y
 
 
 #--- Create Attributespace

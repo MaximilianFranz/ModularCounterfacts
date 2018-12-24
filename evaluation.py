@@ -16,9 +16,32 @@ import localsurrogate
 from adversarial_detection import AdversarialDetection
 
 
-def finalEvaluation(jobs=103):
+def finalEvaluation(jobs=103, dataset='uci'):
     # --- Create Training and Test set
-    X, Y = init.load_data_txt()
+
+    if dataset == 'uci':
+        X, Y = init.load_data_txt()
+        # For UCI Credit Dataset use LIMIT_BAL (Credit Limit) and AGE
+        attr1 = 0
+        attr2 = 5
+    elif dataset == 'iris':
+        X, Y = init.load_data_iris()
+        # Use Petal Length and Petal Width to to distinguish best between versicolor and non-versicolor
+        attr1 = 2
+        attr2 = 3
+    elif dataset == 'survival':
+        X, Y = init.load_data_survival()
+        # TODO : Find best parameter choice with PCA / Lasso
+        attr1 = 0
+        attr2 = 1
+    elif dataset == 'breast_cancer':
+        X, Y = init.load_data_breast_cancer()
+        # TODO : Find best parameter choice with PCA / Lasso
+        attr1 = 0
+        attr2 = 1
+    else:
+        raise NotImplementedError('dataset ' + dataset + 'not available.')
+
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1000)
 
     # --- Train Random Forest
@@ -29,16 +52,19 @@ def finalEvaluation(jobs=103):
     print("Accuracy:", accuracy_score(Y_test, clf.predict(X_test)))
     print("Report:\n", classification_report(Y_test, clf.predict(X_test)))
 
-    # --- Parameter Choice
-    # For UCI Credit Dataset use LIMIT_BAL (Credit Limit) and AGE
-    attr1 = 0
-    attr2 = 5
+
+    print(Y_test)
+    print('train', Y_train)
+    print(clf.predict_proba(X_test))
 
     # --- Instances for the evaluation
     # Choose only instances which classify as 'Credit Unworthy'
+
     test_candidates = np.array(range(0, len(Y_test)))[clf.predict(X_test) == 0][9:jobs]
-    test_candidates = np.delete(test_candidates,
-                                [9, 16, 17, 18, 22, 24, 25, 29, 32, 33, 36, 37, 66, 67, 71, 76, 78, 82, 87, 88])
+    print(test_candidates)
+    # test_candidates = np.delete(test_candidates,
+    #                             [9, 16, 17, 18, 22, 24, 25, 29, 32, 33, 36, 37, 66, 67, 71, 76, 78, 82, 87, 88])
+
     # --- Initialize time-variables
     dt_ls = []
     dt_ls1 = []
@@ -75,6 +101,7 @@ def finalEvaluation(jobs=103):
             dummy[attr1] = coord1
             dummy[attr2] = coord2
             coord3 = np.array(clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
+            print('coord3', coord3)
             if coord3 >= 0.5:
                 positive_found = True
                 break
@@ -111,6 +138,7 @@ def finalEvaluation(jobs=103):
             time2 = time.time()  # --- Beende Zeitmessung
             dt_gg4.append(time2 - time1)
             print('extension-end')
+            print('eval-range:', dec.eval_range)
 
             dt_gg.append(time2 - time0)
 
@@ -165,7 +193,7 @@ def finalEvaluation(jobs=103):
             ana = analysis.analysis(myexp.lime_m, myexp.lime_c, dec.svmQuick_m, dec.svmQuick_c, ls_exp.ls_m,
                                     ls_exp.ls_c, explainer.m, explainer.b, attr1, attr2, myexp.mean, myexp.sigma,
                                     X_test[i], X_test, Y_test, clf,
-                                    dec.eval_range)
+                                    explainer.eval_range)
             # ana.drawAll(attr1, attr2)
 
             print('eval-start')
@@ -174,6 +202,7 @@ def finalEvaluation(jobs=103):
             acc_lime.append(ana.accuracies[0])
             acc_gg.append(ana.accuracies[1])
             acc_ls.append(ana.accuracies[2])
+
             break
 
     # --- Ausgabe der Ergebnisse
@@ -217,6 +246,6 @@ def finalEvaluation(jobs=103):
 
 
 if __name__ == '__main__':
-    finalEvaluation()
+    finalEvaluation(dataset='iris')
 
 print("\nImplementierung wurde erfolgreich gestartet. Die Methode\n--> finalEvaluation()\nkann nun ausgeführt werden.")

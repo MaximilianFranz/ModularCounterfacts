@@ -23,19 +23,8 @@ class analysis():
         self.x = X_test
         self.y = Y_test
         self.clf = clf
-        #--- Evaluierungsbereich bestimmen
-        #self.evaluation_cands = np.array(range(0,len(Y_test)))[clf.predict(X_test) == 0]
-        #xxx = np.array([True,False,True,False,True,False,True,False])
-        #yyy = np.array([False,True,False,True,False,True,False,True])
-        xxx = []
-        yyy = []
-        for i in range(0,int(len(eval_range)/2)):
-            xxx.append(eval_range[2*i])
-            yyy.append(eval_range[2*i+1])
-        xxx = np.array(xxx)
-        yyy = np.array(yyy)
 
-        self.eval_range = np.array([[np.min(xxx), np.max(xxx)], [np.min(yyy), np.max(yyy)]])
+        self.eval_range = eval_range
         #--- Referenzwerte (welche Seite von den Geraden ist als 0 klassifiziert)
         self.ref_lime = self.predict(self.lime_m, self.lime_c, [instance[attr1], instance[attr2]])
         self.ref_own = self.predict(self.own_m, self.own_c, [instance[attr1], instance[attr2]])
