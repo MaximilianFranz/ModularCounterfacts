@@ -31,6 +31,8 @@ class AdversarialDetection():
         self.clf = clf
         self.chosen_attributes = chosen_attributes
         self.scaler = StandardScaler().fit(self.X)
+        self.mean = self.scaler.mean_
+        self.variance = self.scaler.var_
         self.ms = MagneticSampler(clf, self.scaler)
 
         self.max_point = np.amax(X, axis=0)
