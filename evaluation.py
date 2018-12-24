@@ -33,12 +33,12 @@ def finalEvaluation(jobs=103, dataset='uci'):
         X, Y = init.load_data_survival()
         # TODO : Find best parameter choice with PCA / Lasso
         attr1 = 0
-        attr2 = 1
+        attr2 = 2
     elif dataset == 'breast_cancer':
         X, Y = init.load_data_breast_cancer()
         # TODO : Find best parameter choice with PCA / Lasso
-        attr1 = 0
-        attr2 = 1
+        attr1 = 20
+        attr2 = 23
     else:
         raise NotImplementedError('dataset ' + dataset + 'not available.')
 
@@ -51,11 +51,6 @@ def finalEvaluation(jobs=103, dataset='uci'):
     # --- Accuracy
     print("Accuracy:", accuracy_score(Y_test, clf.predict(X_test)))
     print("Report:\n", classification_report(Y_test, clf.predict(X_test)))
-
-
-    print(Y_test)
-    print('train', Y_train)
-    print(clf.predict_proba(X_test))
 
     # --- Instances for the evaluation
     # Choose only instances which classify as 'Credit Unworthy'
@@ -101,7 +96,6 @@ def finalEvaluation(jobs=103, dataset='uci'):
             dummy[attr1] = coord1
             dummy[attr2] = coord2
             coord3 = np.array(clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
-            print('coord3', coord3)
             if coord3 >= 0.5:
                 positive_found = True
                 break
@@ -182,7 +176,7 @@ def finalEvaluation(jobs=103, dataset='uci'):
             time1 = time.time()
             # adversarial with Magnetic Sampling
             explainer = AdversarialDetection(X, clf=clf, chosen_attributes=[attr1, attr2])
-            explainer.explain_instance(X_test[i], num_samples=600)
+            # explainer.explain_instance(X_test[i], num_samples=600)
             time2 = time.time()
             dt_adv.append(time2 - time1)
 
@@ -191,9 +185,9 @@ def finalEvaluation(jobs=103, dataset='uci'):
             # +------------------+
             print('ana-start')
             ana = analysis.analysis(myexp.lime_m, myexp.lime_c, dec.svmQuick_m, dec.svmQuick_c, ls_exp.ls_m,
-                                    ls_exp.ls_c, explainer.m, explainer.b, attr1, attr2, myexp.mean, myexp.sigma,
+                                    ls_exp.ls_c, 0, 0, attr1, attr2, explainer.mean, explainer.variance,
                                     X_test[i], X_test, Y_test, clf,
-                                    explainer.eval_range)
+                                    dec.eval_range, use_mce=False)
             # ana.drawAll(attr1, attr2)
 
             print('eval-start')
@@ -246,6 +240,6 @@ def finalEvaluation(jobs=103, dataset='uci'):
 
 
 if __name__ == '__main__':
-    finalEvaluation(dataset='iris')
+    finalEvaluation(dataset='survival')
 
 print("\nImplementierung wurde erfolgreich gestartet. Die Methode\n--> finalEvaluation()\nkann nun ausgeführt werden.")
