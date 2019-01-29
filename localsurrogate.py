@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import copy
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, RidgeClassifier
 
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -18,6 +18,11 @@ class localSurrogate():
         self.sigma = np.sqrt(np.sum((dataset-self.mean)*(dataset-self.mean), axis=0)/len(dataset))
         self.instance_trafo = self.transform([instance[attr[0]], instance[attr[1]]])
 
+    def get_explainer(self):
+        return self.explainer
+
+    def get_name(self):
+        return 'local surrogate'
 
     def rand_sphere(self, a0, a1):
         dim = 2
@@ -119,12 +124,13 @@ class localSurrogate():
             coord3 = np.array(self.clf.predict_proba(np.array(dummy).reshape(1, -1))[0])[1]
             self.Z[i].append(int(coord3 >= 0.5))
 
-        clf = Ridge(alpha=1.0)
+        clf = RidgeClassifier(alpha=1.0)
         X=np.array(self.Z)[:,0:2]
         y=np.array(self.Z)[:,2]
         clf.fit(X, y)
-        self.ls_m = -clf.coef_[0] / clf.coef_[1]
-        self.ls_c = (0.5 - clf.intercept_) / clf.coef_[1]
+        self.explainer = clf
+        # self.ls_m = -clf.coef_[0] / clf.coef_[1]
+        # self.ls_c = (0.5 - clf.intercept_) / clf.coef_[1]
 
 
     def drawLS(self, attr1, attr2):

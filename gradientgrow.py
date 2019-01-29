@@ -35,6 +35,13 @@ class Decision:
             self.attr_range.append([min(self.dataset[:,item]),
                                     max(self.dataset[:,item])])
 
+    def get_explainer(self):
+        return self.clf_own
+
+    def get_name(self):
+        return 'gradient grow'
+
+
     def get_last_instance(self):
         """
 
@@ -531,6 +538,7 @@ class Decision:
         #--- create svm
         clf_svm = svm.SVC(kernel='linear', C=100.0, tol=1e-6, max_iter=-1)
         clf_svm.fit(X,y)
+        self.clf_own = clf_svm
 
         #--- create a mesh to plot
         x_min, x_max = min(X[:, 0]), max(X[:, 0])

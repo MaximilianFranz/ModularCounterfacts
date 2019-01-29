@@ -98,7 +98,7 @@ class MagneticSampler():
     def magnetic_sampling(self,
                           original_instance,
                           adversarial_instance,
-                          num_samples,
+                          num_support,
                           features,
                           sector_depth=0.6,  # must be set depending on the dataset
                           sector_width=0.35,  # About 20 degree,
@@ -113,7 +113,7 @@ class MagneticSampler():
         Args:
             original_instance:
             adversarial_instance:
-            num_samples:
+            num_support:
             features: list of feature positions in the feature vectors that ought to be used.
             sector_depth:
             sector_width:
@@ -178,7 +178,7 @@ class MagneticSampler():
 
             total_samples = adjust_features(original_instance, features, total_samples, restricted_original)
 
-            diff = num_samples - total_samples.shape[0]
+            diff = num_support - total_samples.shape[0]
             print('diff: ', diff)
             if diff > 0:
                 # To few samples are drawn
@@ -190,10 +190,10 @@ class MagneticSampler():
             # Remove edge cases where a negative sample was drawn
             cleaned_samples = self.clean(total_samples)
 
-            diff = num_samples - cleaned_samples.shape[0]
+            diff = num_support - cleaned_samples.shape[0]
 
             if diff < 0:
-                take = np.random.choice(len(cleaned_samples), num_samples)
+                take = np.random.choice(len(cleaned_samples), num_support)
                 cleaned_samples = cleaned_samples[take]
 
             print('TOTAL-SHAPE:', total_samples.shape)

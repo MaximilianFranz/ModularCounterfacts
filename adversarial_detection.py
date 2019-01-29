@@ -2,10 +2,12 @@ import time
 import numpy as np
 import pandas as pd
 
+from psopy import minimize
+
 import matplotlib.pyplot as plt
 from matplotlib import style
 
-from sklearn.linear_model import Ridge, lars_path
+from sklearn.linear_model import Ridge, lars_path, RidgeClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -40,6 +42,12 @@ class AdversarialDetection():
 
         self.max_distance = np.linalg.norm(self.max_point - self.min_point)
         self.eval_range = []
+
+    def get_explainer(self):
+        return self.explainer
+
+    def get_name(self):
+        return 'MCE'
 
     def load_data_txt(self, normalize=False):
         data = pd.read_csv("UCI_Credit_Card.csv")
@@ -168,7 +176,7 @@ class AdversarialDetection():
         X = self.sample_set[:, self.chosen_attributes]
         y = self.predictions
         # TODO: Automate Parameters
-        clf = Ridge(alpha=0.1)
+        clf = RidgeClassifier(alpha=0.1)
         clf.fit(X, y)
         self.explainer = clf
         return self.explainer
@@ -213,12 +221,11 @@ class AdversarialDetection():
         """
 
         self.instance = instance
-        self.first_adversarial = self.adversarial_with_minimize(self.instance)
+        self.first_adversarial = self.adversarial_with_nelder_mead(self.instance)
         # TODO: Automate Parameters
-        self.support_points = self.ms.magnetic_sampling(self.clf.predict_proba,
-                                                        instance,
+        self.support_points = self.ms.magnetic_sampling(instance,
                                                         self.first_adversarial,
-                                                        num_samples=num_support,
+                                                        num_support=num_support,
                                                         features=self.chosen_attributes,
                                                         sector_width=0.35,
                                                         confidence=confidence,
@@ -234,6 +241,7 @@ class AdversarialDetection():
         features = self.get_primary_features(self.sample_set, self.predictions, num_features)
         print('used features: ', features)
         tree = DecisionTreeClassifier(max_depth=len(features) + 1)  # allow one split-level per feature
+        self.explainer = tree
         self.predictions = np.round(self.predictions)
         print('labels: ', self.predictions)
         tree.fit(self.sample_set[:, features], self.predictions)
@@ -271,7 +279,7 @@ class AdversarialDetection():
         self.support_points = self.ms.magnetic_sampling(
                                                         instance,
                                                         self.first_adversarial,
-                                                        num_samples=num_support,
+                                                        num_support=num_support,
                                                         features=self.chosen_attributes,
                                                         sector_width=0.35,
                                                         confidence=confidence,
@@ -302,8 +310,8 @@ class AdversarialDetection():
         print('train explainer time: ', two - one)
 
         # Clf trained on only 2D data -> take the only two coefs
-        self.m = (-1) * self.explainer.coef_[0] / self.explainer.coef_[1]
-        self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
+        # self.m = (-1) * self.explainer.coef_[0] / self.explainer.coef_[1]
+        # self.b = (0.5 - self.explainer.intercept_) / self.explainer.coef_[1]
         return self.explainer
 
     def plot_results(self):

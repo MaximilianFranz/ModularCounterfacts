@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import copy
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, RidgeClassifier
 
 import matplotlib.pyplot as plt
 from matplotlib import style
@@ -24,6 +24,11 @@ class limeExplainer():
 
         self.instance_trafo = self.transform([instance[attr[0]], instance[attr[1]]])
 
+    def get_explainer(self):
+        return self.explainer
+
+    def get_name(self):
+        return 'lime'
 
     def locality(self, z0, local=1.0):
         res1 = np.exp(-(self.instance_trafo[0] - z0[0])*(self.instance_trafo[0] - z0[0])/(local*local))
@@ -72,16 +77,17 @@ class limeExplainer():
         self.Z = Z
 
         # Train Ridge classifier on weighted features
-        clf = Ridge(alpha=1.0)
+        clf = RidgeClassifier(alpha=1.0)
         X=np.array(Z)[:,0:2]
         y=np.array(Z)[:,2]
         w=np.array(Z)[:,3]
         clf.fit(X, y, w)
-        self.lime_m = -clf.coef_[0] / clf.coef_[1]
-        self.lime_c = (0.5 - clf.intercept_) / clf.coef_[1]
+        self.explainer = clf
+        # self.lime_m = -clf.coef_[0] / clf.coef_[1]
+        # self.lime_c = (0.5 - clf.intercept_) / clf.coef_[1]
 
-        self.lime_m_trafo = self.lime_m*self.sigma[self.attr[1]]/self.sigma[self.attr[0]]
-        self.lime_c_trafo = self.mean[self.attr[1]] + self.lime_c*self.sigma[self.attr[1]] - self.lime_m*self.mean[self.attr[0]]*self.sigma[self.attr[1]]/self.sigma[self.attr[0]]
+        # self.lime_m_trafo = self.lime_m*self.sigma[self.attr[1]]/self.sigma[self.attr[0]]
+        # self.lime_c_trafo = self.mean[self.attr[1]] + self.lime_c*self.sigma[self.attr[1]] - self.lime_m*self.mean[self.attr[0]]*self.sigma[self.attr[1]]/self.sigma[self.attr[0]]
 
 
     def drawLIME(self, instance, attr1, attr2):
