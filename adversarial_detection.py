@@ -243,7 +243,6 @@ class AdversarialDetection():
         tree = DecisionTreeClassifier(max_depth=len(features) + 1)  # allow one split-level per feature
         self.explainer = tree
         self.predictions = np.round(self.predictions)
-        print('labels: ', self.predictions)
         tree.fit(self.sample_set[:, features], self.predictions)
         export_tree(tree, 'tree.pdf')
 
