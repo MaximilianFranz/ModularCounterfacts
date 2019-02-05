@@ -50,7 +50,8 @@ def explainer_evaluation(clf, instance, list_of_methods, eval_range_min, eval_ra
         else:
             colors.append('tomato')
 
-    plt.scatter(eval_data_full[:, feature_positions[0]], eval_data_full[:, feature_positions[1]], c=colors)
+    plt.scatter(*instance[feature_positions], c='r', marker="X", s=100)
+    plt.scatter(grid_data[:, 0], grid_data[:, 1], c=colors, s=10, marker=".")
     plt.show()
 
 
