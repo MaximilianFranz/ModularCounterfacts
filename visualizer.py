@@ -10,6 +10,7 @@ class ExplanationVisualizer():
 
     def __init__(self, explainer, features_to_show=None):
         self.explainer = explainer
+
         if not features_to_show:
             self.features_to_show = self.explainer.features
         else:
@@ -21,6 +22,11 @@ class ExplanationVisualizer():
     def present_explanation(self, **kwargs):
         """
         Visual presentation of the surrogate
+
+        TODO:
+         - Choose most significant features by yourself in case of visual representation when given features
+           are either None or greater than 2
+         - Automatically provide textual explanation when to many features are given ..
 
         Args:
             explainer:
@@ -42,9 +48,7 @@ class ExplanationVisualizer():
             grid_data = np.array(np.meshgrid(*eval_data, sparse=False, indexing='ij')).reshape(2, -1).T
             eval_data_full = adjust_features(normal_instance, features, grid_data, 0)
 
-            score = self.explainer.score(self.sample_set[:, self.chosen_attributes], self.predictions)
-            print('score of explainer ', score)
-            exp_pred = self.explainer.sg.surrogate.predict(eval_data_full[:, features].reshape(-1, 1))
+            exp_pred = self.explainer.sg.surrogate.predict(eval_data_full)
 
             colors = []
             for y_i in exp_pred:

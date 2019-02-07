@@ -32,7 +32,7 @@ class SurrogateTrainer():
         """
         max_arg = np.amax(border_touchpoints, axis=0)
         min_arg = np.amin(border_touchpoints, axis=0)
-        self.eval_range = np.array([min_arg[self.chosen_features], max_arg[self.chosen_features]]).T
+        self.eval_range = np.array([min_arg[self.chosen_features], max_arg[self.chosen_features]])
 
         result = np.array(border_touchpoints)
         num_per_point = int(num_samples / len(border_touchpoints))
