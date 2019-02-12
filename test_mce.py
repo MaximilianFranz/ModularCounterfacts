@@ -1,9 +1,10 @@
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 from explainer import DefaultExplainer
 from visualizer import ExplanationVisualizer
-from init import load_data_txt
+from data_loader import load_data_txt
 
 def test():
     chosen_attributes = [0, 5]
@@ -14,6 +15,13 @@ def test():
 
     explainer = DefaultExplainer(clf, X, chosen_attributes)
     explainer.explain_instance(X_test[18])
+
+    y_clf = clf.predict(X_test)
+    y_exp = explainer.sg.surrogate.predict(X_test)
+    print('comparison score: ', accuracy_score(y_clf, y_exp))
+
+
+
     viz = ExplanationVisualizer(explainer, chosen_attributes)
     viz.present_explanation()
 

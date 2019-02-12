@@ -27,6 +27,8 @@ class ExplanationVisualizer():
          - Choose most significant features by yourself in case of visual representation when given features
            are either None or greater than 2
          - Automatically provide textual explanation when to many features are given ..
+         - Provide explanations for positive predicitions (by how much was I accepted?)
+         -
 
         Args:
             explainer:
