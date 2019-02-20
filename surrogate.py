@@ -6,6 +6,7 @@ from sklearn.linear_model import RidgeClassifier, lars_path
 from sklearn.tree import DecisionTreeClassifier
 
 from graph_export import export_tree
+import utils
 
 class SurrogateTrainer():
 
@@ -46,32 +47,6 @@ class SurrogateTrainer():
 
         return result
 
-    @staticmethod
-    def get_primary_features(data, labels, num_features):
-        """ Returns most relevant *num_features* features using lars_path
-
-
-        Args:
-            data: the training data
-            labels: labels for training / Y.
-            num_features: Number of features desired
-
-        Returns:
-            used_features: list of indices of the relevant features in the data
-        """
-        _, _, coefs = lars_path(data,
-                                labels,
-                                method='lasso',
-                                verbose=False)
-
-        for i in range(len(coefs.T) - 1, 0, -1):
-            nonzero = coefs.T[i].nonzero()[0]
-            if len(nonzero) <= num_features:
-                break
-        used_features = nonzero
-
-        return used_features
-
     def export_explainer(self):
         if isinstance(self.surrogate, DecisionTreeClassifier):
             export_tree(self.surrogate, file_name='tree_explainer.pdf')
@@ -111,7 +86,7 @@ class LinearSurrogate(SurrogateTrainer):
             used_features = features
         elif num_features and num_features > 0:
             # Find best num_features using lars
-            used_features = SurrogateTrainer.get_primary_features(sample_set, y, num_features)
+            used_features = utils.get_primary_features(sample_set, y, num_features)
         else:
             used_features = range(sample_set.shape[1]) # Use all features available
 
@@ -151,7 +126,7 @@ class TreeSurrogate(SurrogateTrainer):
             used_features = features
         elif num_features and num_features > 0:
             # Find best num_features using lars
-            used_features = SurrogateTrainer.get_primary_features(sample_set, y, num_features)
+            used_features = utils.get_primary_features(sample_set, y, num_features)
         else:
             used_features = range(sample_set.shape[1]) # Use all features available
 

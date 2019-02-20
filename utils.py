@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.linear_model import RidgeClassifier, lars_path
 
 
 def ct(spherical):
@@ -81,3 +82,29 @@ def adjust_features(instance, feature_positions, feature_updates, restricted_ori
     result = np.full((feature_updates.shape[0], instance.size), instance)
     result[:, feature_positions] = feature_updates
     return result
+
+def get_primary_features(data, labels, num_features):
+        """ Returns most relevant *num_features* features using lars_path
+
+
+        Args:
+            data: the training data
+            labels: labels for training / Y.
+            num_features: Number of features desired
+
+        Returns:
+            used_features: list of indices of the relevant features in the data
+        """
+        _, _, coefs = lars_path(data,
+                                labels,
+                                method='lasso',
+                                verbose=False)
+
+        for i in range(len(coefs.T) - 1, 0, -1):
+            nonzero = coefs.T[i].nonzero()[0]
+            if len(nonzero) <= num_features:
+                break
+        used_features = nonzero
+
+        return used_features
+
