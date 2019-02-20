@@ -1,4 +1,6 @@
 from nelder_mead import nelder_mead
+import numpy as np
+from statsmodels import robust
 import gradientgrow as gg
 
 
@@ -26,6 +28,31 @@ class CounterFactualFinder():
             """
 
             return target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1]
+
+        return nelder_mead(func, instance)[0]
+
+    def improved_nelder_mead(self, instance, target_value=1, weigths=None):
+
+        mad = robust.mad(self.data, axis=0)
+
+        def manhattan_distance(y, x=instance, weigths=weigths):
+
+            if weigths is None:
+                weigths = np.full(len(x), 1)
+
+            abs = np.abs(x - y)
+
+            result = np.nansum(np.divide(abs, mad) * weigths)
+            if np.isinf(result):
+                return 0
+            return result
+
+        def func(x, l=10):
+
+            feat = l*(target_value - self.clf.predict_proba(x.reshape(1,-1))[0, 1])
+            optimize = feat + manhattan_distance(x)
+
+            return optimize
 
         return nelder_mead(func, instance)[0]
 
