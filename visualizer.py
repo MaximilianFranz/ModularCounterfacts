@@ -12,14 +12,14 @@ class ExplanationVisualizer():
         self.explainer = explainer
 
         if not features_to_show:
-            self.features_to_show = self.explainer.features
+            self.features_to_show = self.explainer.chosen_features
         else:
             self.features_to_show = features_to_show
 
         if self.explainer.sg.eval_range is not None:
             self.eval_range = self.explainer.sg.eval_range
 
-    def present_explanation(self, **kwargs):
+    def present_explanation(self, method="visual", **kwargs):
         """
         Visual presentation of the surrogate
 
@@ -27,8 +27,8 @@ class ExplanationVisualizer():
          - Choose most significant features by yourself in case of visual representation when given features
            are either None or greater than 2
          - Automatically provide textual explanation when to many features are given ..
-         - Provide explanations for positive predicitions (by how much was I accepted?)
-         -
+         - Provide explanations for positive predictions (by how much was I accepted?)
+         - counterfactual relative change as explanation
 
         Args:
             explainer:
@@ -36,7 +36,13 @@ class ExplanationVisualizer():
         Returns:
 
         """
-        self.plot_results(self.explainer.last_instance, self.features_to_show)
+        if method == "visual":
+            self.present_tolerance(self.explainer.last_instance, self.features_to_show)
+            # self.plot_results(self.explainer.last_instance, self.features_to_show)
+        elif method == "relative":
+            pass
+
+
 
     def plot_results(self, normal_instance, features):
         """
@@ -63,4 +69,24 @@ class ExplanationVisualizer():
             plt.scatter(*normal_instance[features], c='r', marker="X", s=100)
             plt.scatter(grid_data[:, 0], grid_data[:, 1], c=colors, s=10, marker=".")
             plt.show()
+
+    def explain_relative(self, instance, counterfactual, features):
+
+        print('your features: ', instance[features])
+        print('desired features: ', counterfactual[features])
+        print('differences:', (instance - counterfactual)[features])
+
+    def present_tolerance(self, instance, features):
+
+        if self.explainer.sg.surrogate.predict(instance.reshape(1, -1)) != self.explainer.desired_label:
+            # Tolerance meaningless, skip
+            pass
+
+        distances = instance[features] - self.explainer.touchpoints[:, features]
+        min_distances = np.min(distances, axis=0)
+        print('minimum required change: ', min_distances)
+
+
+
+
 
