@@ -1,3 +1,7 @@
+# ignore big datasets
+
+/data/ids/
+
 /pyvenv/ 
 /.idea
 
