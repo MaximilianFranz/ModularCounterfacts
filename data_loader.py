@@ -9,6 +9,43 @@ style.use("ggplot")
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_iris, load_breast_cancer
 
+KDD_COL_NAMES = np.array(["duration", "protocol_type", "service", "flag", "src_bytes",
+                          "dst_bytes", "land", "wrong_fragment", "urgent", "hot", "num_failed_logins",
+                          "logged_in", "num_compromised", "root_shell", "su_attempted", "num_root",
+                          "num_file_creations", "num_shells", "num_access_files", "num_outbound_cmds",
+                          "is_host_login", "is_guest_login", "count", "srv_count", "serror_rate",
+                          "srv_serror_rate", "rerror_rate", "srv_rerror_rate", "same_srv_rate",
+                          "diff_srv_rate", "srv_diff_host_rate", "dst_host_count", "dst_host_srv_count",
+                          "dst_host_same_srv_rate", "dst_host_diff_srv_rate", "dst_host_same_src_port_rate",
+                          "dst_host_srv_diff_host_rate", "dst_host_serror_rate", "dst_host_srv_serror_rate",
+                          "dst_host_rerror_rate", "dst_host_srv_rerror_rate", "labels"])
+
+IDS_DDOS_COL_NAMES_string = "Destination Port, Flow Duration, Total Fwd Packets, Total Backward Packets,Total Length of Fwd Packets, Total Length of Bwd Packets, Fwd Packet Length Max, Fwd Packet Length Min, Fwd Packet Length Mean, Fwd Packet Length Std,Bwd Packet Length Max, Bwd Packet Length Min, Bwd Packet Length Mean, Bwd Packet Length Std,Flow Bytes/s, Flow Packets/s, Flow IAT Mean, Flow IAT Std, Flow IAT Max, Flow IAT Min,Fwd IAT Total, Fwd IAT Mean, Fwd IAT Std, Fwd IAT Max, Fwd IAT Min,Bwd IAT Total, Bwd IAT Mean, Bwd IAT Std, Bwd IAT Max, Bwd IAT Min,Fwd PSH Flags, Bwd PSH Flags, Fwd URG Flags, Bwd URG Flags, Fwd Header Length, Bwd Header Length,Fwd Packets/s, Bwd Packets/s, Min Packet Length, Max Packet Length, Packet Length Mean, Packet Length Std, Packet Length Variance,FIN Flag Count, SYN Flag Count, RST Flag Count, PSH Flag Count, ACK Flag Count, URG Flag Count, CWE Flag Count, ECE Flag Count, Down/Up Ratio, Average Packet Size, Avg Fwd Segment Size, Avg Bwd Segment Size, Fwd Header Length,Fwd Avg Bytes/Bulk, Fwd Avg Packets/Bulk, Fwd Avg Bulk Rate, Bwd Avg Bytes/Bulk, Bwd Avg Packets/Bulk,Bwd Avg Bulk Rate,Subflow Fwd Packets, Subflow Fwd Bytes, Subflow Bwd Packets, Subflow Bwd Bytes,Init_Win_bytes_forward, Init_Win_bytes_backward, act_data_pkt_fwd, min_seg_size_forward,Active Mean, Active Std, Active Max, Active Min,Idle Mean, Idle Std, Idle Max, Idle Min, Label"
+IDS_DDOS_COL_NAMES_string = IDS_DDOS_COL_NAMES_string.replace(" ", "")
+IDS_DDOS_COL_NAMES_string = IDS_DDOS_COL_NAMES_string.replace("\n", "")
+IDS_DDOS_COL_NAMES_string = IDS_DDOS_COL_NAMES_string.lower()
+
+IDS_DDOS_COL_NAMES = IDS_DDOS_COL_NAMES_string.split(',')
+
+
+
+
+def load_heloc(normalize=False):
+
+    # TODO: Remove features that have zero variance over the dataset (one value)
+    # TODO: Remove features with very strong correlation
+    data = pd.read_csv("data/heloc.csv")
+
+    mapping = {'normal': False, 'Bad': False}
+    data['RiskPerformance'] = data['RiskPerformance'].map(mapping)
+
+    Y = np.array(data.pop("RiskPerformance"))
+    data = data.astype('float64')
+    X = np.array(data)
+    if normalize:
+        X = StandardScaler().fit_transform(X)
+
+    return X, Y
 
 #--- Credit Daten aus CSV-Datei lesen
 def load_data_txt(normalize=False):
@@ -22,6 +59,59 @@ def load_data_txt(normalize=False):
         X = StandardScaler().fit_transform(X)
 
     return X, Y
+
+def load_kdd_csv(normalize=False, train=True):
+    """
+    Load NLS KDD dataset from csv
+     - transform labels to binary (normal vs. attack) and omit categorical features for simplicity
+
+    :param normalize: whether to normalize the feature values
+    :param train: whether to get train dataset (True) or test (False)
+    :return: The data and labels
+    """
+
+    categorical_columns = ["protocol_type", "service", "flag"]
+
+    if train:
+        data = pd.read_csv("data/kdd.csv", names=KDD_COL_NAMES)
+    else:
+        data = pd.read_csv("data/kdd_t.csv", names=KDD_COL_NAMES)
+
+    data['labels'] = np.where(data['labels'].str.match('normal'), 1, 0)
+    data.drop(categorical_columns, axis=1, inplace=True)
+
+    Y = data.pop('labels')
+    X = data
+
+    if normalize:
+        X = StandardScaler().fit_transform(X)
+
+    return X, Y
+
+def load_ids_csv(normalize=False, train=True):
+    """
+
+    :param normalize:
+    :param train:
+    :return: data, labels, feature names
+    """
+
+    print(IDS_DDOS_COL_NAMES)
+
+    data = pd.read_csv("data/ids/ddos.csv", names=IDS_DDOS_COL_NAMES)
+    data['flowbytes/s'] = data['flowbytes/s'].astype('float64')
+    data['flowpackets/s'] = data['flowpackets/s'].astype('float64')
+    data['label'] = np.where(data['label'].str.match('BENIGN'), 0, 1) # train attacks as positive
+    data = data.replace([np.inf, -np.inf], np.nan)
+    data = data.dropna()
+
+    Y = np.array(data.pop('label'))
+    X = np.array(data)
+
+    feature_names = IDS_DDOS_COL_NAMES
+    feature_names.remove("label")
+
+    return X, Y, feature_names
 
 
 def load_data_iris():
