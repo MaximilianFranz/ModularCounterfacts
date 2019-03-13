@@ -179,7 +179,6 @@ class MagneticSampler():
             total_samples = adjust_features(original_instance, features, total_samples, restricted_original)
 
             diff = num_support - total_samples.shape[0]
-            print('diff: ', diff)
             if diff > 0:
                 # To few samples are drawn
                 additional_samples = self.sample_grid(abs(diff), radius_inner, radius_outer,
