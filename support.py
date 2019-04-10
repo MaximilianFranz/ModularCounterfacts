@@ -16,7 +16,7 @@ class SupportFinder():
                                               instance,
                                               counterfactual,
                                               num_support=10,
-                                              sector_width=0.35,
+                                              sector_width=0.1,
                                               confidence=5,
                                               threshold=2):
         """

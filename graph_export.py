@@ -5,9 +5,9 @@ from sklearn.tree import export_graphviz
 import pydotplus
 
 
-def export_tree(tree, file_name):
+def export_tree(tree, file_name, feature_names=None):
     if tree is not None:
-        dot_data = export_graphviz(tree, out_file=None, filled=True, rounded=True)
+        dot_data = export_graphviz(tree, feature_names=feature_names, out_file=None, filled=True, rounded=True)
         graph = pydotplus.graph_from_dot_data(dot_data)
         graph = make_graph_minimal(graph)
 

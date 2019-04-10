@@ -6,7 +6,7 @@ from boundary import BoundaryFinder
 from surrogate import LinearSurrogate, TreeSurrogate
 import utils
 
-NUM_FEATURES = 2
+NUM_FEATURES = 5
 
 class Explainer():
 
@@ -41,7 +41,7 @@ class DefaultExplainer(Explainer):
 
         if chosen_features is None:
             # Use a subset for choosing the significant features
-            data_subset = dataset[np.random.randint(dataset.shape[0], size=1000), :]
+            data_subset = dataset[np.random.randint(dataset.shape[0], size=7000), :]
             labels = self.clf.predict(data_subset)
             self.chosen_features = utils.get_primary_features(data_subset, labels, num_features=NUM_FEATURES)
             print('chosen features: ', self.chosen_features)
@@ -67,9 +67,21 @@ class DefaultExplainer(Explainer):
 
         self.last_instance = instance
 
-        self.counterfactual = self.cf.first_counterfactual_with_nelder_mead(instance, step=10) + 0.0001
+        self.counterfactual = self.cf.improved_nelder_mead(instance, step=1)
         self.support_set = self.sp.support_points_with_magnetic_sampling(instance, self.counterfactual)
         self.touchpoints = self.bd.touchpoints_using_binary_search(self.support_set, instance, fineness=5)
         self.surrogate = self.sg.train_around_border(self.touchpoints)
 
 
+
+    def get_counterfactuals(self, instances):
+
+        results = []
+
+        for instance in instances:
+            print('one')
+            counter = self.cf.minimize(instance, step=0.1)
+            results.append(counter)
+            print(counter - instance)
+
+        return results

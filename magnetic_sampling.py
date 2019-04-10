@@ -14,7 +14,7 @@ style.use('ggplot')
 
 
 class MagneticSampler():
-    def __init__(self, clf, scaler, sector_width=0.35, confidence=5, threshold=2):
+    def __init__(self, clf, scaler, sector_width=0.35, confidence=5, threshold=2, target_value=1):
         """
         Constructor of MagneticSampler
         Args:
@@ -29,6 +29,7 @@ class MagneticSampler():
         self.sector_width = sector_width
         self.confidence = confidence
         self.threshold = threshold
+        self.target_value = target_value
 
     @staticmethod
     def sample_grid(
@@ -81,7 +82,7 @@ class MagneticSampler():
         else:
             trans_set = self.scaler.inverse_transform(samples)
 
-        results = self.clf.predict_proba(trans_set)[:, 1]
+        results = self.clf.predict(trans_set)
         return results[results <= 0.5].size
 
     def clean(self, samples):
@@ -92,7 +93,7 @@ class MagneticSampler():
 
         prob = self.clf.predict_proba(trans_set)[:, 1]
         pos_res_ind = np.where(prob > 0.5)
-        result = samples[pos_res_ind]
+        result = samples[prob > 0.5]
         return result
 
     def magnetic_sampling(self,
@@ -103,7 +104,7 @@ class MagneticSampler():
                           sector_depth=0.6,  # must be set depending on the dataset
                           sector_width=0.35,  # About 20 degree,
                           confidence=10,  # must be set depending on the dataset
-                          threshold=3,
+                          threshold=5,
                           ):
         """
         magnetic_sampling implemented with restriction to a set of features
@@ -150,6 +151,7 @@ class MagneticSampler():
 
             # start original sample
             total_samples = np.zeros((1, restricted_original.size))
+            total_samples = np.append(total_samples, [restricted_adversarial], axis=0)
             while expand_left or expand_right:
                 if expand_left:
                     sampled_lower = self.sample_grid(confidence, radius_inner, radius_outer,
@@ -201,10 +203,22 @@ class MagneticSampler():
             if cleaned_samples.shape[0] > 0:
                 found = True
             else:
-                distance *= 2
+                # Don't increase distance, but use normal distribution
+                return self.use_normal(adversarial_instance)
 
 
         if self.scaler is not None:
-            return self.scaler.inverse_transform(cleaned_samples)
+            return self.scaler.inverse_transform(total_samples)
 
         return cleaned_samples
+
+    def use_normal(self, adversarial_instance):
+        cleaned_samples = []
+        sigma = 0.01
+        while (len(cleaned_samples) == 0):
+            cov = np.diag(np.full(len(adversarial_instance), sigma))
+            samples = np.random.multivariate_normal(adversarial_instance, cov, 10)
+            cleaned_samples = self.clean(samples)
+            sigma *= 2
+
+        return self.scaler.inverse_transform(cleaned_samples)
