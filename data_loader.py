@@ -27,7 +27,10 @@ IDS_DDOS_COL_NAMES_string = IDS_DDOS_COL_NAMES_string.lower()
 
 IDS_DDOS_COL_NAMES = IDS_DDOS_COL_NAMES_string.split(',')
 
+HELOC_STRING = "RiskPerformance,ExternalRiskEstimate,MSinceOldestTradeOpen,MSinceMostRecentTradeOpen,AverageMInFile,NumSatisfactoryTrades,NumTrades60Ever2DerogPubRec,NumTrades90Ever2DerogPubRec,PercentTradesNeverDelq,MSinceMostRecentDelq,MaxDelq2PublicRecLast12M,MaxDelqEver,NumTotalTrades,NumTradesOpeninLast12M,PercentInstallTrades,MSinceMostRecentInqexcl7days,NumInqLast6M,NumInqLast6Mexcl7days,NetFractionRevolvingBurden,NetFractionInstallBurden,NumRevolvingTradesWBalance,NumInstallTradesWBalance,NumBank2NatlTradesWHighUtilization,PercentTradesWBalance"
+HELOC_NAMES = HELOC_STRING.split(',')
 
+UCI_NAMES= np.array(["LIMIT_BAL","SEX","EDUCATION","MARRIAGE","AGE","PAY_0","PAY_2","PAY_3","PAY_4","PAY_5","PAY_6","BILL_AMT1","BILL_AMT2","BILL_AMT3","BILL_AMT4","BILL_AMT5","BILL_AMT6","PAY_AMT1","PAY_AMT2","PAY_AMT3","PAY_AMT4","PAY_AMT5","PAY_AMT6"])
 
 
 def load_heloc(normalize=False):
@@ -36,7 +39,7 @@ def load_heloc(normalize=False):
     # TODO: Remove features with very strong correlation
     data = pd.read_csv("data/heloc.csv")
 
-    mapping = {'normal': False, 'Bad': False}
+    mapping = {'Good': 0, 'Bad': 1}
     data['RiskPerformance'] = data['RiskPerformance'].map(mapping)
 
     Y = np.array(data.pop("RiskPerformance"))
@@ -45,7 +48,7 @@ def load_heloc(normalize=False):
     if normalize:
         X = StandardScaler().fit_transform(X)
 
-    return X, Y
+    return X, Y, HELOC_NAMES.remove('RiskPerfomance')
 
 #--- Credit Daten aus CSV-Datei lesen
 def load_data_txt(normalize=False):
@@ -58,7 +61,7 @@ def load_data_txt(normalize=False):
     if normalize:
         X = StandardScaler().fit_transform(X)
 
-    return X, Y
+    return X, Y, UCI_NAMES
 
 def load_kdd_csv(normalize=False, train=True):
     """
@@ -77,6 +80,9 @@ def load_kdd_csv(normalize=False, train=True):
     else:
         data = pd.read_csv("data/kdd_t.csv", names=KDD_COL_NAMES)
 
+    DOS_LABELS = ['back','land','neptune', 'pod', 'smurt', 'teardrop', 'normal']
+    data = data[ data['labels'].map(lambda  x: x in DOS_LABELS)]
+
     data['labels'] = np.where(data['labels'].str.match('normal'), 1, 0)
     data.drop(categorical_columns, axis=1, inplace=True)
 
@@ -86,7 +92,9 @@ def load_kdd_csv(normalize=False, train=True):
     if normalize:
         X = StandardScaler().fit_transform(X)
 
-    return X, Y
+    names = [e for e in KDD_COL_NAMES if e not in categorical_columns]
+    names.remove('labels')
+    return X, Y, names
 
 def load_ids_csv(normalize=False, train=True):
     """
@@ -96,20 +104,22 @@ def load_ids_csv(normalize=False, train=True):
     :return: data, labels, feature names
     """
 
-    print(IDS_DDOS_COL_NAMES)
-
     data = pd.read_csv("data/ids/ddos.csv", names=IDS_DDOS_COL_NAMES)
     data['flowbytes/s'] = data['flowbytes/s'].astype('float64')
     data['flowpackets/s'] = data['flowpackets/s'].astype('float64')
-    data['label'] = np.where(data['label'].str.match('BENIGN'), 0, 1) # train attacks as positive
+    data['label'] = np.where(data['label'].str.match('BENIGN'), 1, 0) # train attacks as 0
     data = data.replace([np.inf, -np.inf], np.nan)
     data = data.dropna()
+    data = data.loc[:, data.var() != 0] # remove columns with 0 variance
 
     Y = np.array(data.pop('label'))
     X = np.array(data)
 
     feature_names = IDS_DDOS_COL_NAMES
     feature_names.remove("label")
+
+    if normalize:
+        X = StandardScaler().fit_transform(X)
 
     return X, Y, feature_names
 
