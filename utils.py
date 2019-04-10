@@ -1,6 +1,13 @@
 import numpy as np
 from sklearn.linear_model import RidgeClassifier, lars_path
 
+from sklearn.manifold import TSNE
+
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+# noinspection PyPackageRequirements
+from matplotlib import style
+style.use("ggplot")
 
 def ct(spherical):
     """ Tranforms spherical coordinates into a cartesian coordinate vector
@@ -107,4 +114,48 @@ def get_primary_features(data, labels, num_features):
         used_features = nonzero
 
         return used_features
+
+def sample_normal(border_touchpoints, num_samples, sigma):
+    """
+    Samples around the border_touchpoints with a normal distribution to generate
+    a dataset for training a linear model which yields the explanation
+
+    Normal distribution is parametrized based on the distribution of
+    the border_touchpoints, so that we sample along the decision boundary
+
+    """
+    max_arg = np.amax(border_touchpoints, axis=0)
+    min_arg = np.amin(border_touchpoints, axis=0)
+
+    result = np.array(border_touchpoints)
+    num_per_point = int(num_samples / len(border_touchpoints))
+    sigmas = (max_arg - min_arg) * sigma
+
+    for point in border_touchpoints:
+        mean = point
+        cov = np.diag(sigmas ** 2)
+        rand = np.random.multivariate_normal(mean, cov, num_per_point)
+        result = np.append(result, rand, axis=0)
+
+    return result
+
+
+def plot_tsne(X, Y, counterfacts):
+
+    data_length = len(X)
+    print('positives', len(counterfacts))
+
+    union = np.append(X, counterfacts, axis=0)
+
+    transformer = TSNE()
+    x_trans = transformer.fit_transform(union)
+    counterfacts = transformer.fit_transform(counterfacts)
+
+    color_map = ['tomato', 'limegreen'] # 0 is attacks / specials, 1 is normal
+    plt.scatter(union[0 : data_length, 0], union[0 : data_length, 1], c=Y, cmap=ListedColormap(color_map), s=10, marker=".")
+    plt.scatter(union[data_length:, 0], union[data_length:, 1], c='blue', s=10, marker="x")
+    plt.show()
+
+    return 0
+
 
