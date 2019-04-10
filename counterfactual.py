@@ -11,17 +11,7 @@ class CounterFactualFinder():
         self.data = data
         self.chosen_attributes = chosen_attributes
 
-    def first_counterfactual_with_nelder_mead(self, instance, target_value=1, step=10):
-        """
-
-        Args:
-            instance:
-            target_value:
-
-        Returns:
-
-        """
-
+    def minimize(self, instance, target_value=1, step=0):
         def func(x):
             """
             Returns the function to optimize
@@ -31,15 +21,32 @@ class CounterFactualFinder():
             value = (2*target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1])**3
             return value
 
+        return minimize(func, instance, method="Nelder-Mead").x
+
+    def first_counterfactual_with_nelder_mead(self, instance, target_value=1, step=10):
+        """
+        Args:
+            instance:
+            target_value:
+
+        Returns:
+
+        """
+        def func(x):
+            """
+            Returns the function to optimize
+            X must be np.array
+            """
+
+            value = target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1]
+            return value
+
         return nelder_mead(func, instance, step=step)[0]
 
     def improved_nelder_mead(self, instance, target_value=1, weigths=None, step=10):
 
         mad = np.array(robust.mad(self.data, axis=0))
         non_zero = mad[mad != 0] # make sure not to devide by zero
-
-
-        print('mad global', mad)
 
         def manhattan_distance(y, x=instance, weigths=weigths):
 
@@ -56,10 +63,10 @@ class CounterFactualFinder():
         def func(x, l=10):
 
             value = (2*target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1])**3
-            optimize = l*value + manhattan_distance(x)
+            optimize = value + l*manhattan_distance(x)
             return optimize
 
-        return nelder_mead(func, instance, step=step)[0]
+        return minimize(func, instance, method="Nelder-Mead").x
 
     def get_first_adversarial(self, original_instance):
         """
