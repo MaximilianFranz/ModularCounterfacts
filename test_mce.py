@@ -90,7 +90,7 @@ def runon_ids():
 
     choose = np.random.randint(X.shape[0], size=50)
 
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1200)
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1203)
 
     if p.is_file():
         clf = joblib.load(mlp_dump_file)
@@ -100,16 +100,21 @@ def runon_ids():
         joblib.dump(clf, mlp_dump_file)
 
     explainer = DefaultExplainer(clf, X, None)
-
+    global_instance = 0
     for instance in X_test:
         if clf.predict(instance.reshape(1, -1)) < 0.5: # explain attacks (0)
             explainer.explain_instance(instance)
+            global_instance = instance
             break
 
     print('accuracy MLP: ', accuracy_score(clf.predict(X_test), Y_test))
 
     viz = ExplanationVisualizer(explainer, None, feature_names=names)
-    viz.present_explanation(method='visual')
+
+
+    viz.distance_heatmap(global_instance)
+    # viz.present_explanation(method='visual')
+
 
 def tsne_on_ids():
 
@@ -143,4 +148,4 @@ def tsne_on_ids():
     return
 
 if __name__ == '__main__':
-    tsne_on_ids()
+    runon_ids()

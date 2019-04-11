@@ -43,7 +43,7 @@ class CounterFactualFinder():
 
         return nelder_mead(func, instance, step=step)[0]
 
-    def improved_nelder_mead(self, instance, target_value=1, weigths=None, step=10):
+    def improved_nelder_mead(self, instance, target_value=1, weigths=None, step=10, eps=0.3):
 
         mad = np.array(robust.mad(self.data, axis=0))
         non_zero = mad[mad != 0] # make sure not to devide by zero
@@ -63,7 +63,7 @@ class CounterFactualFinder():
         def func(x, l=10):
 
             value = (2*target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1])**3
-            optimize = value + l*manhattan_distance(x)
+            optimize = value + l*manhattan_distance(x)**4
             return optimize
 
         return minimize(func, instance, method="Nelder-Mead").x

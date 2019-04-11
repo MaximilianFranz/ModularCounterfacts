@@ -7,6 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 from treeinterpreter import treeinterpreter as ti
+from statsmodels import robust
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
@@ -151,5 +152,73 @@ class ExplanationVisualizer():
                                  key=lambda x: -abs(x[0]))[0:10]:
             print(feature, c)
 
+    def distance_heatmap(self, instance, fixed_features=False):
 
+        mad = np.array(robust.mad(self.explainer.dataset, axis=0))
+        non_zero = mad[mad != 0] # make sure not to devide by zero
+
+        x_feature, y_feature = 0,0
+
+        # find features with both variance in the and significant effect
+        for feature in self.explainer.chosen_features:
+            if mad[feature] != 0 and x_feature == 0:
+                x_feature = feature
+            elif mad[feature] != 0 and y_feature == 0:
+                y_feature = feature
+
+        delta = 1
+
+        # Use first / most significant features instead of the selected ones
+        if fixed_features:
+            x_feature, y_feature = self.explainer.chosen_features[0:2]
+
+        x_range = [instance[x_feature] - delta, instance[x_feature] + delta]
+        y_range = [instance[y_feature] - delta, instance[y_feature] + delta]
+
+
+        # Generate instance grid on two dimensions
+        xs, ys = np.linspace(*x_range, 10), np.linspace(*y_range, 10)
+        XS, YS = np.meshgrid(xs, ys)
+        XS, YS = XS.flatten(), YS.flatten()
+        updates = np.array(list(zip(XS, YS)))
+
+
+        results = np.empty((10, 10))
+
+        mad = np.array(robust.mad(self.explainer.dataset, axis=0))*10
+        non_zero = mad[mad != 0] # make sure not to devide by zero
+
+        # Copied distance metric from counterfactual
+        # TODO: Refactor functions to avoid Copy
+        def manhattan_distance(y, x=instance, weigths=None):
+
+            if weigths is None:
+                weigths = np.full(len(non_zero), 1)
+
+            abs = np.abs(x - y)[mad != 0]
+
+            result = np.nansum(np.divide(abs, non_zero) * weigths)
+            if np.isinf(result):
+                return 0
+            return result
+
+        def func(x, l=10):
+
+            value = (2*1 - self.explainer.clf.predict_proba(x.reshape(1, -1))[0, 1])**3
+            optimize = l*value + manhattan_distance(x)
+            return value
+
+
+        all_instances = adjust_features(instance, [x_feature, y_feature], updates, 0)
+        i = 0
+
+        for instance in all_instances:
+            results[i // 10][i % 10] = func(instance)
+            i += 1
+
+        fig = plt.figure()
+        s = fig.add_subplot(1, 1, 1, xlabel=self.feature_names[x_feature], ylabel=self.feature_names[y_feature])
+        im = s.imshow(results, cmap=plt.cm.RdBu, extent=(x_range[0],x_range[1], y_range[0], y_range[1]), interpolation='bilinear')
+        plt.colorbar(im)
+        plt.show()
 
