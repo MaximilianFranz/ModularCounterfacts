@@ -47,7 +47,8 @@ class ExplanationVisualizer():
 
         """
         if method == "visual":
-            self.plot_results(self.explainer.last_instance, self.features_to_show)
+            self.distance_heatmap(self.explainer.last_instance)
+            # self.plot_results(self.explainer.last_instance, self.features_to_show)
         elif method == "relative":
             self.explain_relative(self.explainer.last_instance, self.explainer.counterfactual, self.features_to_show)
             self.present_tolerance(self.explainer.last_instance, self.features_to_show)
@@ -104,13 +105,20 @@ class ExplanationVisualizer():
 
         print('your features: ', instance[features])
         print('desired features: ', counterfactual[features])
-        print('differences:', (instance - counterfactual)[features])
+        distance = (instance - counterfactual)[features]
+        eps = 1.0e-8
+        distance[abs(distance) < eps] = 0
+        print('differences:', distance)
 
     def present_tolerance(self, instance, features):
 
-        distances = instance[features] - self.explainer.touchpoints[:, features]
-        min_distances = np.min(distances, axis=0)
-        print('minimum required change: ', min_distances)
+        distances = np.abs(instance[features] - self.explainer.touchpoints[:, features])
+        min = np.argmin(distances, axis=0)
+
+        distance = instance[features] - self.explainer.touchpoints[min, features]
+        eps = 1.0e-8
+        distance[abs(distance) < eps] = 0
+        print('minimum required change: ', distance)
 
     def compare_surrogate(self):
 
@@ -152,7 +160,7 @@ class ExplanationVisualizer():
                                  key=lambda x: -abs(x[0]))[0:10]:
             print(feature, c)
 
-    def distance_heatmap(self, instance, fixed_features=False):
+    def distance_heatmap(self, instance, fixed_features=True):
 
         mad = np.array(robust.mad(self.explainer.dataset, axis=0))
         non_zero = mad[mad != 0] # make sure not to devide by zero
@@ -183,7 +191,9 @@ class ExplanationVisualizer():
         updates = np.array(list(zip(XS, YS)))
 
 
-        results = np.empty((10, 10))
+        results_combined = np.empty((10, 10))
+        results_prediction = np.empty((10, 10))
+        results_metric = np.empty((10, 10))
 
         mad = np.array(robust.mad(self.explainer.dataset, axis=0))*10
         non_zero = mad[mad != 0] # make sure not to devide by zero
@@ -200,25 +210,49 @@ class ExplanationVisualizer():
             result = np.nansum(np.divide(abs, non_zero) * weigths)
             if np.isinf(result):
                 return 0
-            return result
+            return result / len(non_zero)
 
         def func(x, l=10):
 
-            value = (2*1 - self.explainer.clf.predict_proba(x.reshape(1, -1))[0, 1])**3
-            optimize = l*value + manhattan_distance(x)
-            return value
+            value = (1 - self.explainer.clf.predict_proba(x.reshape(1, -1))[0, 1])
+            optimize = value + manhattan_distance(x)/l
+            return optimize
 
 
         all_instances = adjust_features(instance, [x_feature, y_feature], updates, 0)
         i = 0
 
+        # combined
         for instance in all_instances:
-            results[i // 10][i % 10] = func(instance)
+            results_combined[i // 10][i % 10] = func(instance)
             i += 1
 
-        fig = plt.figure()
-        s = fig.add_subplot(1, 1, 1, xlabel=self.feature_names[x_feature], ylabel=self.feature_names[y_feature])
-        im = s.imshow(results, cmap=plt.cm.RdBu, extent=(x_range[0],x_range[1], y_range[0], y_range[1]), interpolation='bilinear')
-        plt.colorbar(im)
+        i = 0
+        for instance in all_instances:
+            results_prediction[i // 10][i % 10] = (1 - self.explainer.clf.predict_proba(instance.reshape(1, -1))[0, 1])
+            i += 1
+
+        i = 0
+        for instance in all_instances:
+            results_metric[i // 10][i % 10] = manhattan_distance(instance)
+            i += 1
+
+        fig, (s1, s2, s3) = plt.subplots(1,3, sharex=True, sharey=True)
+        # s1 = fig.add_subplot(1, 1, 1, xlabel=self.feature_names[x_feature], ylabel=self.feature_names[y_feature])
+        s1.title.set_text('Combined')
+        im = s1.imshow(results_combined, cmap=plt.cm.RdBu, extent=(x_range[0],x_range[1], y_range[0], y_range[1]), interpolation='bilinear')
+        plt.colorbar(im, ax=s1)
+
+        # s2 = fig.add_subplot(1, 1, 1, xlabel=self.feature_names[x_feature], ylabel=self.feature_names[y_feature])
+        s2.title.set_text('Metric')
+        im = s2.imshow(results_metric, cmap=plt.cm.RdBu, extent=(x_range[0],x_range[1], y_range[0], y_range[1]), interpolation='bilinear')
+        plt.colorbar(im, ax=s2)
+
+        # s3 = fig.add_subplot(1, 1, 1, xlabel=self.feature_names[x_feature], ylabel=self.feature_names[y_feature])
+        s3.title.set_text('Prediction')
+        im = s3.imshow(results_prediction, cmap=plt.cm.RdBu, extent=(x_range[0],x_range[1], y_range[0], y_range[1]), interpolation='bilinear')
+        plt.colorbar(im, ax=s3)
+
+        plt.savefig('exports/heatmap.png')
         plt.show()
 
