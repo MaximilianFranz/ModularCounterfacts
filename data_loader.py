@@ -115,8 +115,7 @@ def load_ids_csv(normalize=False, train=True):
     Y = np.array(data.pop('label'))
     X = np.array(data)
 
-    feature_names = IDS_DDOS_COL_NAMES
-    feature_names.remove("label")
+    feature_names = list(data.columns)
 
     if normalize:
         X = StandardScaler().fit_transform(X)
