@@ -21,6 +21,13 @@ class ExplanationVisualizer():
         self.explainer = explainer
         self.feature_names=feature_names
 
+        # scoring for later acces
+        self.tree_score = 0
+        self.linear_score = 0
+
+        self.tree_surrogate = None
+        self.linear_surrogate = None
+
         if not features_to_show:
             self.features_to_show = self.explainer.chosen_features
         else:
@@ -112,21 +119,43 @@ class ExplanationVisualizer():
 
     def present_tolerance(self, instance, features):
 
-        distances = np.abs(instance[features] - self.explainer.touchpoints[:, features])
-        min = np.argmin(distances, axis=0)
+        distances = np.sum(np.abs(instance[features] - self.explainer.touchpoints[:, features]), axis=1)
 
-        distance = instance[features] - self.explainer.touchpoints[min, features]
-        eps = 1.0e-8
-        distance[abs(distance) < eps] = 0
-        print('minimum required change: ', distance)
+        print('confidence score: ', np.min(distances))
+
+    def construct_test_data_around_instance(self, instance, max_distance=0.3):
+        """
+        Sampling instances from the original dataset that are close to the instance given
+        :param instance: Around which to sample
+        :param max_distance: distance limit within which to sample
+        :return:
+        """
+        dataset = self.explainer.dataset
+        data_subset = dataset[np.random.randint(dataset.shape[0], size=20000), :]
+        dist = np.sum(np.abs(data_subset - instance), axis=1) / data_subset.shape[1]
+        result = data_subset[dist < max_distance]
+        return result
 
     def compare_surrogate(self):
 
-        data = sample_normal(self.explainer.touchpoints, 500, 2)
+        # data = sample_normal(self.explainer.touchpoints, 500, 2)
+
+        # Compare around decision boundary
+        data = self.construct_test_data_around_instance(self.explainer.touchpoints[0])
         clf_pred = self.explainer.clf.predict(data)
         srg_pred = self.explainer.sg.surrogate.predict(data)
 
-        print('accuracy surrogate ', accuracy_score(srg_pred, clf_pred))
+        self.linear_surrogate = self.explainer.sg.surrogate
+        self.linear_score = accuracy_score(srg_pred, clf_pred)
+        print('accuracy surrogate around DB', self.linear_score)
+
+        # Compare around original distance
+        data = self.construct_test_data_around_instance(self.explainer.last_instance, max_distance=0.6)
+        clf_pred = self.explainer.clf.predict(data)
+        srg_pred = self.explainer.sg.surrogate.predict(data)
+        self.linear_score = accuracy_score(srg_pred, clf_pred)
+        print('accuracy surrogate around instance', self.linear_score)
+
 
     def export_decision_tree(self):
 
@@ -136,10 +165,20 @@ class ExplanationVisualizer():
         tree = DecisionTreeClassifier(max_depth=3)
         tree.fit(data, clf_pred)
 
+        data = self.construct_test_data_around_instance(self.explainer.touchpoints[0])
         tree_pred = tree.predict(data)
+        clf_pred = self.explainer.clf.predict(data)
 
         export_tree(tree, 'exports/db_tree.pdf', self.feature_names)
-        print('accuracy tree ', accuracy_score(tree_pred, clf_pred))
+        self.tree_surrogate = tree
+        self.tree_score = accuracy_score(tree_pred, clf_pred)
+        print('accuracy tree around DB', self.tree_score)
+
+        data = self.construct_test_data_around_instance(self.explainer.last_instance, max_distance=0.6)
+        tree_pred = tree.predict(data)
+        clf_pred = self.explainer.clf.predict(data)
+        self.tree_score = accuracy_score(tree_pred, clf_pred)
+        print('accuracy tree around instance', self.tree_score)
 
     def feature_importance(self):
         """

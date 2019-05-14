@@ -112,6 +112,11 @@ def load_ids_csv(normalize=False, train=True):
     data = data.dropna()
     data = data.loc[:, data.var() != 0] # remove columns with 0 variance
 
+    c = df.corr().abs()
+
+    s = c.unstack()
+    so = s.sort_values(kind="quicksort")
+
     Y = np.array(data.pop('label'))
     X = np.array(data)
 

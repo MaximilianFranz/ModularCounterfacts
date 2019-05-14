@@ -6,7 +6,7 @@ from boundary import BoundaryFinder
 from surrogate import LinearSurrogate, TreeSurrogate
 import utils
 
-NUM_FEATURES = 5
+NUM_FEATURES = 10
 
 class Explainer():
 
@@ -33,18 +33,19 @@ class Explainer():
 
 class DefaultExplainer(Explainer):
 
-    def __init__(self, clf, dataset, chosen_features=None, desired_label=1):
+    def __init__(self, clf, dataset, chosen_features=None, num_features=10, features_names=None):
         super().__init__()
         self.clf = clf
         self.dataset = dataset
-        self.desired_label = 1
+        self.num_features = num_features # used when no features chosen
+        self.feature_names = np.array(features_names)
 
         if chosen_features is None:
             # Use a subset for choosing the significant features
             data_subset = dataset[np.random.randint(dataset.shape[0], size=7000), :]
             labels = self.clf.predict(data_subset)
-            self.chosen_features = utils.get_primary_features(data_subset, labels, num_features=NUM_FEATURES)
-            print('chosen features: ', self.chosen_features)
+            self.chosen_features = utils.get_primary_features(data_subset, labels, num_features=self.num_features)
+            print('chosen features: ', self.feature_names[self.chosen_features])
         else:
             self.chosen_features = chosen_features
 
@@ -54,7 +55,7 @@ class DefaultExplainer(Explainer):
         self.sg = LinearSurrogate(self.clf, self.chosen_features, alpha=0.1)
 
 
-    def explain_instance(self, instance, chosen_features=None):
+    def explain_instance(self, instance, chosen_features=None, target_label=1):
         """
 
         Args:
@@ -67,7 +68,7 @@ class DefaultExplainer(Explainer):
 
         self.last_instance = instance
 
-        self.counterfactual = self.cf.improved_nelder_mead(instance, step=1)
+        self.counterfactual = self.cf.improved_nelder_mead(instance, target_value=target_label, step=10)
         self.support_set = self.sp.support_points_with_magnetic_sampling(instance, self.counterfactual)
         self.touchpoints = self.bd.touchpoints_using_binary_search(self.support_set, instance, fineness=5)
         self.surrogate = self.sg.train_around_border(self.touchpoints)
@@ -79,9 +80,7 @@ class DefaultExplainer(Explainer):
         results = []
 
         for instance in instances:
-            print('one')
-            counter = self.cf.minimize(instance, step=0.1)
+            counter = self.cf.improved_nelder_mead(instance, step=1)
             results.append(counter)
-            print(counter - instance)
 
         return results

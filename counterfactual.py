@@ -51,7 +51,7 @@ class CounterFactualFinder():
         def manhattan_distance(y, x=instance, weigths=weigths):
 
             if weigths is None:
-                weigths = np.full(len(non_zero), 1)
+                weigths = np.full(len(non_zero), 10)
 
             abs = np.abs(x - y)[mad != 0]
 
@@ -60,13 +60,14 @@ class CounterFactualFinder():
                 return 0
             return result
 
-        def func(x, l=10):
+        def func(x, l=20):
 
-            value = (2*target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1])**3
-            optimize = value + l*manhattan_distance(x)**4
+            value = abs(target_value - self.clf.predict_proba(x.reshape(1, -1))[0, 1])
+            optimize = value + l*manhattan_distance(x)
+            # print(str(value) + " " + str(l*manhattan_distance(x)))
             return optimize
 
-        return minimize(func, instance, method="Nelder-Mead").x
+        return minimize(func, instance, method="Nelder-Mead", options={'adaptive': True}).x
 
     def get_first_adversarial(self, original_instance):
         """
