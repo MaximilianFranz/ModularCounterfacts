@@ -1,6 +1,7 @@
-# ignore big datasets
+# ignore big datasets and export files
 
 /data/ids/
+/exports/
 
 /pyvenv/ 
 /.idea
