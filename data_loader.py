@@ -74,6 +74,7 @@ def load_kdd_csv(normalize=False, train=True):
     """
 
     categorical_columns = ["protocol_type", "service", "flag"]
+    correlated = ["srv_serror_rate", "num_compromised", "dst_host_srv_serror_rate", "dst_host_serror_rate", "srv_rerror_rate", "dst_host_srv_rerror_rate", "dst_host_rerror_rate"]
 
     if train:
         data = pd.read_csv("data/kdd.csv", names=KDD_COL_NAMES)
@@ -85,6 +86,7 @@ def load_kdd_csv(normalize=False, train=True):
 
     data['labels'] = np.where(data['labels'].str.match('normal'), 1, 0)
     data.drop(categorical_columns, axis=1, inplace=True)
+    data.drop(correlated, axis=1, inplace=True)
 
     Y = data.pop('labels')
     X = data
@@ -92,19 +94,22 @@ def load_kdd_csv(normalize=False, train=True):
     if normalize:
         X = StandardScaler().fit_transform(X)
 
-    names = [e for e in KDD_COL_NAMES if e not in categorical_columns]
+    names = [e for e in KDD_COL_NAMES if (e not in categorical_columns and e not in correlated) ]
     names.remove('labels')
     return X, Y, names
 
-def load_ids_csv(normalize=False, train=True):
+def load_ids_csv(normalize=False):
     """
+    Loads the IDS dataset and applies some cleaning.
+    Removes features that remain the same throughout the dataset.
+    Removes features that are obviously strongly correlated (std, min, max, mean - of one value)
 
-    :param normalize:
-    :param train:
+
+    :param normalize: Whether or not to normalize the dataset
     :return: data, labels, feature names
     """
 
-    data = pd.read_csv("data/ids/ddos.csv", names=IDS_DDOS_COL_NAMES)
+    data = pd.read_csv("data/ids/web.csv", names=IDS_DDOS_COL_NAMES)
     data['flowbytes/s'] = data['flowbytes/s'].astype('float64')
     data['flowpackets/s'] = data['flowpackets/s'].astype('float64')
     data['label'] = np.where(data['label'].str.match('BENIGN'), 1, 0) # train attacks as 0
@@ -112,10 +117,9 @@ def load_ids_csv(normalize=False, train=True):
     data = data.dropna()
     data = data.loc[:, data.var() != 0] # remove columns with 0 variance
 
-    c = df.corr().abs()
+    cleaned_cols = [c for c in data.columns if ('max' not in c.lower()) and ('min' not in c.lower()) and ('std' not in c.lower()) and ('packets' not in c.lower())]
 
-    s = c.unstack()
-    so = s.sort_values(kind="quicksort")
+    data = data[cleaned_cols]
 
     Y = np.array(data.pop('label'))
     X = np.array(data)

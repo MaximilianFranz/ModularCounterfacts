@@ -10,7 +10,7 @@ import utils
 
 class SurrogateTrainer():
 
-    def __init__(self, clf, chosen_features):
+    def __init__(self, clf, chosen_features, dataset):
         """
 
         Args:
@@ -18,6 +18,7 @@ class SurrogateTrainer():
         """
         self.chosen_features = chosen_features
         self.clf = clf
+        self.dataset = dataset
 
         self.eval_range = None # Later holds the range of points sampled and thus a approximation of the eval area of the explainer
         self.surrogate = None # Last trained explainer is available here
@@ -47,6 +48,22 @@ class SurrogateTrainer():
 
         return result
 
+    def sample_around_instance_from_dataset(self, border_touchpoints, num_samples, max_distance=0.5):
+        """
+
+        :param border_touchpoints:
+        :param num_samples:
+        :return:
+        """
+        result = np.array(border_touchpoints)
+
+        num_per_point = int(num_samples / len(border_touchpoints))
+        for point in border_touchpoints:
+            set = utils.construct_test_data_around_instance(self.dataset, point, max_distance=max_distance, size=num_per_point)
+            result = np.append(result, set, axis=0)
+
+        return result
+
     def export_explainer(self):
         if isinstance(self.surrogate, DecisionTreeClassifier):
             export_tree(self.surrogate, file_name='tree_explainer.pdf')
@@ -72,8 +89,8 @@ class SurrogateTrainer():
 
 class LinearSurrogate(SurrogateTrainer):
 
-    def __init__(self, clf, chosen_features, alpha=0.1):
-        super().__init__(clf, chosen_features)
+    def __init__(self, clf, chosen_features, dataset, alpha=0.1):
+        super().__init__(clf, chosen_features, dataset)
         self.alpha = alpha
 
     def train_surrogate(self, sample_set, features=None, num_features=None):
@@ -96,10 +113,10 @@ class LinearSurrogate(SurrogateTrainer):
         return self.surrogate
 
     def train_around_border(self, border_touchpoints, features=None, num_features=None):
-        sample_set = super().sample_normal(border_touchpoints, num_samples=500, sigma=0.1)
+        sample_set = super().sample_around_instance_from_dataset(border_touchpoints, num_samples=500)
         return self.train_surrogate(sample_set, features, num_features)
 
-    def train_ridge(self, x, y, alpha=0.1):
+    def train_ridge(self, x, y, alpha=0.0001):
         """
         Trains a Ridge classifier on the sampled data and classifier predictions considering only
         the chosen_attributes for now, for simplicity
@@ -112,8 +129,8 @@ class LinearSurrogate(SurrogateTrainer):
 
 class TreeSurrogate(SurrogateTrainer):
 
-    def __init__(self, clf, chosen_features, max_depth=None):
-        super().__init__(clf, chosen_features)
+    def __init__(self, clf, chosen_features, dataset, max_depth=None):
+        super().__init__(clf, chosen_features, dataset)
         self.max_depth = max_depth
 
     def train_surrogate(self, sample_set, features=None, num_features=None):

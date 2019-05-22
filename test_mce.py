@@ -99,7 +99,10 @@ def runon_ids():
         clf.fit(X_train, Y_train)
         joblib.dump(clf, mlp_dump_file)
 
-    explainer = DefaultExplainer(clf, X, None)
+    pred = clf.predict(X_test)
+    false = X_test[pred != Y_test]
+
+    explainer = DefaultExplainer(clf, X, features_names=names)
     global_instance = 0
     for instance in X_test:
         if clf.predict(instance.reshape(1, -1)) < 0.5: # explain attacks (0)
@@ -112,7 +115,7 @@ def runon_ids():
     viz = ExplanationVisualizer(explainer, None, feature_names=names)
 
 
-    viz.distance_heatmap(global_instance)
+    viz.present_explanation(method='relative')
     # viz.present_explanation(method='visual')
 
 
@@ -123,7 +126,6 @@ def tsne_on_ids():
 
     X, Y, names = load_ids_csv(normalize=True)
 
-    choose = np.random.randint(X.shape[0], size=50)
 
 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=1201)
@@ -135,10 +137,12 @@ def tsne_on_ids():
         clf.fit(X_train, Y_train)
         joblib.dump(clf, mlp_dump_file)
 
+    choose = np.random.randint(X.shape[0], size=50)
     data_subset = X[choose, :]
     label_subset = Y[choose]
     explainer = DefaultExplainer(clf, X, None)
     counterfacts = explainer.get_counterfactuals(data_subset[label_subset == 0])
+
 
     distances = abs(counterfacts - data_subset[label_subset == 0])
     print(np.average(distances, axis=0))

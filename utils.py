@@ -139,9 +139,24 @@ def sample_normal(border_touchpoints, num_samples, sigma):
 
     return result
 
+def construct_test_data_around_instance(dataset, instance, max_distance=0.3, size=None):
+        """
+        Sampling instances from the original dataset that are close to the instance given
+        :param instance: Around which to sample
+        :param max_distance: distance limit within which to sample
+        :return:
+        """
+        data_subset = dataset[np.random.randint(dataset.shape[0], size=20000), :]
+        dist = np.sum(np.abs(data_subset - instance), axis=1) / data_subset.shape[1]
+        result = data_subset[dist < max_distance]
+        if size is None or result.shape[0] < size:
+            return result
+        else:
+            return result[0:size]
+
+
 
 def plot_tsne(X, Y, counterfacts):
-
     data_length = len(X)
     print('positives', len(counterfacts))
 
@@ -149,11 +164,10 @@ def plot_tsne(X, Y, counterfacts):
 
     transformer = TSNE()
     x_trans = transformer.fit_transform(union)
-    counterfacts = transformer.fit_transform(counterfacts)
 
     color_map = ['tomato', 'limegreen'] # 0 is attacks / specials, 1 is normal
-    plt.scatter(union[0 : data_length, 0], union[0 : data_length, 1], c=Y, cmap=ListedColormap(color_map), s=10, marker=".")
-    plt.scatter(union[data_length:, 0], union[data_length:, 1], c='blue', s=10, marker="x")
+    plt.scatter(x_trans[0 : data_length, 0], x_trans[0 : data_length, 1], c=Y, cmap=ListedColormap(color_map), s=10, marker=".")
+    plt.scatter(x_trans[data_length:, 0], x_trans[data_length:, 1], c='blue', s=10, marker="x")
     plt.show()
 
     return 0

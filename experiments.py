@@ -1,11 +1,14 @@
 import numpy as np
+
 import joblib
 import argparse
 from pathlib import Path
 
+import sklearn
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import SGDClassifier
 
 from sacred import Ingredient
 from sacred import Experiment
@@ -18,6 +21,10 @@ from data_loader import load_ids_csv, load_kdd_csv
 from explainer import DefaultExplainer
 from visualizer import ExplanationVisualizer
 
+import utils
+
+import lime
+import lime.lime_tabular
 
 # Argparsing
 
@@ -53,7 +60,7 @@ ex_ids.observers.append(MongoObserver.create(url='localhost:27017', db_name='sac
 @ex_ids.config
 def ids_conf():
     normalize = True
-    random_state = 1203
+    random_state = 1204
     chosen_features = None
     mlp_dump_file = "exports/mlp_ids.joblib"
     hidden_layer_sizes = (20, 5)
@@ -78,8 +85,6 @@ def run_ids(_log,
 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=random_state)
 
-
-
     if classifier == "mlp":
         _log.info('using mlp')
         if p.is_file():
@@ -90,39 +95,48 @@ def run_ids(_log,
             joblib.dump(clf, mlp_dump_file)
     elif classifier == "rf":
         _log.info('using random forest')
-        clf = RandomForestClassifier(n_jobs=100, n_estimators=100, random_state=random_state)
-        clf.fit(X, Y)
+        clf = RandomForestClassifier(n_jobs=100, n_estimators=10, random_state=random_state)
+        clf.fit(X_train, Y_train)
 
-    _log.info('accuracy CLF: ' + str(accuracy_score(clf.predict(X_test), Y_test)))
     print('accuracy CLF: ', accuracy_score(clf.predict(X_test), Y_test))
 
     pred = clf.predict(X_test)
     false_classified = X_test[pred != Y_test]
 
     if quantitative:
-        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names)
+        explainer = DefaultExplainer(clf, X_train, chosen_features, features_names=names, testset=X_test, testlabels=Y_test)
         viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names)
-        for instance in false_classified:
+        i = 0
+        for instance in false_classified[6:]:
+            print('Instance ', i )
             pred = clf.predict(instance.reshape(1, -1))
             explainer.explain_instance(instance, target_label=(1-pred))
             viz.present_explanation(method='relative')
-            # viz.present_explanation(method='visual')
-            ex_ids.log_scalar('linear_accuracy', viz.linear_score)
-            ex_ids.log_scalar('tree_accuracy', viz.tree_score)
+            ex_ids.log_scalar('linear_accuracy_instance', viz.linear_score_instance)
+            ex_ids.log_scalar('tree_accuracy_instance', viz.tree_score_instance)
+            ex_ids.log_scalar('linear_accuracy_db', viz.linear_score_db)
+            ex_ids.log_scalar('tree_accuracy_db', viz.tree_score_db)
+            ex_ids.log_scalar('lime_accuracy_instance', viz.lime_score_instance)
+            ex_ids.log_scalar('lime_accuracy_db', viz.lime_score_db)
+            ex_ids.log_scalar('tree_global', viz.tree_score_global)
+            ex_ids.log_scalar('confidence', viz.confidence)
+            ex_ids.log_scalar('probability attack', (-1)*np.log(viz.prediction_proba[0,0]) - np.log(viz.prediction_proba[0,1]))
+            ex_ids.log_scalar('feature recall', viz.feature_recall_count)
+            i += 1
 
     else:
-        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names)
+        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names, testset=X_test, testlabels=Y_test)
         for instance in false_classified:
             if clf.predict(instance.reshape(1, -1)) < 0.5: # explain false positives (attacks (0))
                 explainer.explain_instance(instance)
+                # explain_lime(instance, X_train, names, ['normal','attack'], clf)
                 break
 
 
-        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names)
+        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=0.3)
 
 
         viz.present_explanation(method='relative')
-        viz.present_explanation(method='visual')
 
         ex_ids.add_artifact('exports/heatmap.png')
         ex_ids.add_artifact('exports/db_tree.pdf')
@@ -134,11 +148,11 @@ ex_kdd.observers.append(MongoObserver.create(url='localhost:27017', db_name='sac
 @ex_kdd.config
 def kdd_conf():
     normalize = True
-    random_state = 1000
+    random_state = 1001
     chosen_features = None
     mlp_dump_file = "exports/mlp_kdd.joblib"
     classifier = "mlp"
-    quantitative = True
+    quantitative = False
 
 
 @ex_kdd.main
@@ -179,9 +193,9 @@ def run_kdd(_log,
     false_classified = Xtest[pred != Ytest]
 
     if quantitative:
-        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names)
+        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names, testset=Xtest, testlabels=Ytest)
         viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names)
-        for instance in Xtest[:20, : ]:
+        for instance in false_classified:
             pred = clf.predict(instance.reshape(1, -1))
             if pred < 0.5:
                 explainer.explain_instance(instance, target_label=(1-pred))
@@ -189,19 +203,29 @@ def run_kdd(_log,
                 ex_kdd.log_scalar('linear_accuracy', viz.linear_score)
                 ex_kdd.log_scalar('tree_accuracy', viz.tree_score)
     else:
-        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names)
-        for instance in Xtest:
+        explainer = DefaultExplainer(clf, X, chosen_features, features_names=names, testset=Xtest, testlabels=Ytest)
+        for instance in false_classified:
             if clf.predict(instance.reshape(1, -1)) < 0.5: # try on false positive (wrongly classfied as attack)
                 explainer.explain_instance(instance)
                 break
 
-        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names)
+        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=0.6)
         viz.present_explanation(method='relative')
         # viz.present_explanation(method='visual')
 
         ex_kdd.add_artifact('exports/heatmap.png')
         ex_kdd.add_artifact('exports/db_tree.pdf')
 
+@ex_kdd.capture
+@ex_ids.capture
+def explain_lime(instance, train, feature_names, target_names, clf, export_file='exports/lime.pdf'):
+
+    explainer = lime.lime_tabular.LimeTabularExplainer(train, feature_names=feature_names,
+                                                       class_names=target_names, discretize_continuous=True)
+    exp = explainer.explain_instance(instance, clf.predict_proba, num_features=4, top_labels=3)
+    fig = exp.as_pyplot_figure()
+    fig.tight_layout()
+    fig.savefig(export_file, format='pdf')
 
 
 
