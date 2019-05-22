@@ -2,6 +2,7 @@
 
 /data/ids/
 /exports/
+/sacred/
 
 /pyvenv/ 
 /.idea
