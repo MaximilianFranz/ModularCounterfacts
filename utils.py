@@ -107,6 +107,8 @@ def get_primary_features(data, labels, num_features):
                                 method='lasso',
                                 verbose=False)
 
+        nonzero = None
+
         for i in range(len(coefs.T) - 1, 0, -1):
             nonzero = coefs.T[i].nonzero()[0]
             if len(nonzero) <= num_features:
@@ -146,14 +148,20 @@ def construct_test_data_around_instance(dataset, instance, max_distance=0.3, siz
         :param max_distance: distance limit within which to sample
         :return:
         """
-        data_subset = dataset[np.random.randint(dataset.shape[0], size=20000), :]
-        dist = np.sum(np.abs(data_subset - instance), axis=1) / data_subset.shape[1]
-        result = data_subset[dist < max_distance]
+        use_max = max_distance
+        while True:
+            data_subset = dataset[np.random.randint(dataset.shape[0], size=20000), :]
+            dist = np.sum(np.abs(data_subset - instance), axis=1) / data_subset.shape[1]
+            result = data_subset[dist < use_max]
+            if len(result) is 0:
+                use_max += 0.3
+            else:
+                break
+
         if size is None or result.shape[0] < size:
             return result
         else:
             return result[0:size]
-
 
 
 def plot_tsne(X, Y, counterfacts):

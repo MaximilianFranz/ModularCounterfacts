@@ -1,5 +1,5 @@
 import numpy as np
-from utils import create_ranges, adjust_features, sample_normal, get_primary_features
+from utils import create_ranges, adjust_features, sample_normal, get_primary_features, construct_test_data_around_instance
 from graph_export import export_tree
 
 import sklearn
@@ -63,7 +63,9 @@ class ExplanationVisualizer():
         elif method == "relative":
             print('\n --------------------------------------')
             # self.explain_relative(self.explainer.last_instance, self.explainer.counterfactual, self.features_to_show)
-            self.present_tolerance(self.explainer.last_instance, self.features_to_show)
+            # self.present_tolerance(self.explainer.last_instance, self.features_to_show)
+            self.confidence = 0
+            self.prediction_proba = 0
             self.compare_surrogate()
             self.compare_lime()
             self.tree_accuracy_global()
@@ -134,7 +136,7 @@ class ExplanationVisualizer():
         eps = 1.0e-8
         distance[abs(distance) < eps] = 0
 
-        ind = np.arange(len(selected_features))  # the x locations for the groups
+        ind = np.arange(len(selected_features)/2, step=0.5)  # the x locations for the groups
         width = 0.35  # the width of the bars: can also be len(x) sequence
 
         p1 = plt.bar(ind, instance[selected_features], width, alpha=0.7)
@@ -142,9 +144,13 @@ class ExplanationVisualizer():
 
         plt.ylabel('normalized feature values')
         plt.title('Relative Feature Difference')
-        plt.xticks(ind, np.array(self.feature_names)[selected_features])
-        min = np.min(counterfactual[selected_features])
-        max = np.max(counterfactual[selected_features])
+        plt.xticks(ind, np.array(self.feature_names)[selected_features], rotation='vertical')
+        # Pad margins so that markers don't get clipped by the axes
+        plt.margins(0.2)
+        # Tweak spacing to prevent clipping of tick-labels
+        plt.subplots_adjust(bottom=0.3)
+        min = np.min(np.append(counterfactual[selected_features], instance[selected_features], axis=0))
+        max = np.max(np.append(counterfactual[selected_features], instance[selected_features], axis=0))
         plt.yticks(np.linspace(min, max, num=10))
         plt.legend((p1[0], p2[0]), ('Instance', 'Counterfactual'))
 
@@ -160,34 +166,27 @@ class ExplanationVisualizer():
         self.prediction_proba = self.explainer.clf.predict_proba(self.explainer.last_instance.reshape(1, -1))
         print('prediction proba: ', self.prediction_proba)
 
-    def construct_test_data_around_instance(self, instance, max_distance=0.3):
-        """
-        Sampling instances from the original dataset that are close to the instance given
-        :param instance: Around which to sample
-        :param max_distance: distance limit within which to sample
-        :return:
-        """
-        dataset = self.explainer.dataset
-        data_subset = dataset[np.random.randint(dataset.shape[0], size=20000), :]
-        dist = np.sum(np.abs(data_subset - instance), axis=1) / data_subset.shape[1]
-        result = data_subset[dist < max_distance]
-        return result
-
     def compare_surrogate(self):
 
         # data = sample_normal(self.explainer.touchpoints, 500, 2)
 
         # Compare around decision boundary
-        data = self.construct_test_data_around_instance(self.explainer.touchpoints[0], max_distance=self.max_distance)
+        data = construct_test_data_around_instance(self.explainer.dataset, self.explainer.touchpoints[0], max_distance=self.max_distance)
         clf_pred = self.explainer.clf.predict(data)
         srg_pred = self.explainer.sg.surrogate.predict(data)
+        sg = self.explainer.sg.surrogate
 
 
         self.linear_surrogate = self.explainer.sg.surrogate
         self.linear_score_db = accuracy_score(srg_pred, clf_pred)
 
+        print('LOCAL LINEAR feature importance ',
+              list(zip(np.array(self.feature_names)[np.flip(np.argsort(np.abs(sg.coef_[0]))[-10:])],
+                  np.flip(sg.coef_[0][np.argsort(np.abs(sg.coef_[0]))][-10:])))
+              )
+
         # Compare around original distance
-        data = self.construct_test_data_around_instance(self.explainer.last_instance, max_distance=self.max_distance)
+        data = construct_test_data_around_instance(self.explainer.dataset, self.explainer.last_instance, max_distance=self.max_distance)
         clf_pred = self.explainer.clf.predict(data)
         srg_pred = self.explainer.sg.surrogate.predict(data)
         self.linear_score_instance = accuracy_score(srg_pred, clf_pred)
@@ -198,13 +197,13 @@ class ExplanationVisualizer():
     def compare_lime(self):
         lime = self.create_lime_surrogate(self.explainer.last_instance, self.explainer.dataset, self.explainer.clf)
 
-        data = self.construct_test_data_around_instance(self.explainer.touchpoints[0])
+        data = construct_test_data_around_instance(self.explainer.dataset, self.explainer.touchpoints[0], max_distance=self.max_distance)
         clf_pred = self.explainer.clf.predict(data)
         srg_pred = lime.predict(data)
 
         self.lime_score_db = accuracy_score(srg_pred, clf_pred)
 
-        data = self.construct_test_data_around_instance(self.explainer.last_instance, max_distance=self.max_distance)
+        data = construct_test_data_around_instance(self.explainer.dataset, self.explainer.last_instance, max_distance=self.max_distance)
         clf_pred = self.explainer.clf.predict(data)
         srg_pred = lime.predict(data)
         self.lime_score_instance = accuracy_score(srg_pred, clf_pred)
@@ -239,7 +238,7 @@ class ExplanationVisualizer():
 
     def export_decision_tree(self):
 
-        data = self.construct_test_data_around_instance(self.explainer.touchpoints[0], max_distance=self.max_distance)
+        data = construct_test_data_around_instance(self.explainer.dataset, self.explainer.touchpoints[0], max_distance=self.max_distance)
         clf_pred = self.explainer.clf.predict(data)
         X_train, X_test, Y_train, Y_test = train_test_split(data, clf_pred, test_size=0.2, random_state=1000)
 
@@ -248,7 +247,7 @@ class ExplanationVisualizer():
 
         self.surrogate_features = np.array(self.feature_names)[np.flip(np.argsort(np.abs(tree.feature_importances_)))][0:10]
 
-        data_db = self.construct_test_data_around_instance(self.explainer.touchpoints[0], max_distance=self.max_distance)
+        data_db = construct_test_data_around_instance(self.explainer.dataset, self.explainer.touchpoints[0], max_distance=self.max_distance)
         tree_pred = tree.predict(X_test)
         clf_pred = self.explainer.clf.predict(X_test)
 
@@ -257,7 +256,12 @@ class ExplanationVisualizer():
         self.tree_score_db = accuracy_score(tree_pred, clf_pred)
         print('accuracy tree around DB', self.tree_score_db)
 
-        data = self.construct_test_data_around_instance(self.explainer.last_instance, max_distance=self.max_distance)
+        print('LOCAL tree feature importance ',
+              list(zip(np.array(self.feature_names)[np.flip(np.argsort(np.abs(tree.feature_importances_))[-10:])],
+                  np.flip(tree.feature_importances_[np.argsort(np.abs(tree.feature_importances_))][-10:])))
+              )
+
+        data = construct_test_data_around_instance(self.explainer.dataset, self.explainer.last_instance, max_distance=self.max_distance)
         tree_pred = tree.predict(data)
         clf_pred = self.explainer.clf.predict(data)
         self.tree_score_instance = accuracy_score(tree_pred, clf_pred)
@@ -266,7 +270,7 @@ class ExplanationVisualizer():
 
     def tree_accuracy_global(self):
 
-        data_subset = self.explainer.dataset[np.random.randint(self.explainer.dataset.shape[0], size=7000)]
+        data_subset = self.explainer.dataset[np.random.randint(self.explainer.dataset.shape[0], size=20000)]
         clf_pred = self.explainer.clf.predict(data_subset)
 
         linear = RidgeClassifier(alpha=1.0)
@@ -304,7 +308,7 @@ class ExplanationVisualizer():
         :return: feature importance of surrogate random forest
         """
 
-        data_subset = self.construct_test_data_around_instance(self.explainer.touchpoints[0], max_distance=0.6)
+        data_subset = construct_test_data_around_instance(self.explainer.dataset, self.explainer.touchpoints[0], max_distance=0.6)
         pred = self.explainer.clf.predict(data_subset)
         rf = RandomForestClassifier(n_estimators=100)
         rf.fit(data_subset, pred)
@@ -320,7 +324,7 @@ class ExplanationVisualizer():
         print('------------------------- \n')
 
     def lars_features_local(self):
-        data_subset = self.construct_test_data_around_instance(self.explainer.last_instance, max_distance=0.6)
+        data_subset = construct_test_data_around_instance(self.explainer.dataset, self.explainer.last_instance, max_distance=self.max_distance)
         labels = self.explainer.clf.predict(data_subset)
         features = get_primary_features(data_subset, labels, num_features=self.explainer.num_features)
         print('FEATURE IMPORTANCE LARS locally around instance')
