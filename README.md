@@ -1,12 +1,6 @@
-# GradientGrow - Adaption and Extension
+# Modular Counterfactuals 
 
-This repository contains adaptions of the original *GradientGrow* source code supervised by Nadia el Bekri at Fraunhofer IOSB, Karlsruhe.
-
-The `evaluation.py` is the executable file which implements a comparison of different methods to explain instances of a classfication performed with a RandomForestClassifier. The compared methods are:
- - LIME
- - LocalSurrogate
- - GradientGrow
-
+This repository contains the preliminary code of the modular counterfactual explanation framework *MCE*, supervised by Nadia el Bekri at Fraunhofer IOSB, Karlsruhe.
 
 
 # To Try yourself
@@ -24,13 +18,16 @@ and install the required packages with `pip`:
 ```bash
 pip install -r requirements.txt
 ```
-from inside the source code directory you can then try a test run on the UCI Credit Dataset with:
+from inside the source code directory you can then try a test run using the `experiments.py`
 ```bash
-python evaluation.py
+python experiments.py --ex ids
 ```
 
-# Documentation
-We're still working on the documentation of the source code. To do this consistently we adhere to the Google Style Python Docstrings like explained [here](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html)
+using the `--ex ids/kdd` flag, you can choose between running the experimental evaluation on KDD or IDS datasets, if provided correctly. 
+
+# Experiment Environment - Sacred
+To keep track of our experiments, we use `sacred`. How to use sacred for other experiments as well can be seen in the `experiments.py`. 
+We use `sacred` with the [MongoObserver](https://sacred.readthedocs.io/en/latest/observers.html#mongo-observer) and display results using [Omniboard](https://vivekratnavel.github.io/omniboard/#/quick-start).
 
 # Code Refactoring
 Along with adding consistent docs we ought to improve code formatting and the
