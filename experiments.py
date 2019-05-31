@@ -6,9 +6,10 @@ from pathlib import Path
 
 import sklearn
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.neural_network import MLPClassifier
-from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import RidgeClassifier, SGDClassifier
 
 from sacred import Ingredient
 from sacred import Experiment
@@ -17,7 +18,7 @@ from sacred.observers import MongoObserver
 from sklearn.model_selection import train_test_split
 
 # local imports
-from data_loader import load_ids_csv, load_kdd_csv
+from data_loader import load_ids_csv, load_kdd_csv, load_data_txt, load_heloc
 from explainer import DefaultExplainer
 from visualizer import ExplanationVisualizer
 
@@ -60,7 +61,7 @@ ex_ids.observers.append(MongoObserver.create(url='localhost:27017', db_name='sac
 @ex_ids.config
 def ids_conf():
     normalize = True
-    random_state = 1204
+    random_state = 1205
     chosen_features = None
     mlp_dump_file = "exports/mlp_ids.joblib"
     hidden_layer_sizes = (20, 5)
@@ -95,17 +96,20 @@ def run_ids(_log,
             joblib.dump(clf, mlp_dump_file)
     elif classifier == "rf":
         _log.info('using random forest')
-        clf = RandomForestClassifier(n_jobs=100, n_estimators=10, random_state=random_state)
+        # clf = RandomForestClassifier(n_jobs=100, n_estimators=100, random_state=random_state)
+        # clf = SGDClassifier(loss='log', alpha=0.1)
+        clf = MLPClassifier(solver='adam', alpha=1e-2, hidden_layer_sizes=hidden_layer_sizes, random_state=1)
         clf.fit(X_train, Y_train)
 
-    print('accuracy CLF: ', accuracy_score(clf.predict(X_test), Y_test))
+    print('accuracy CLF: ', accuracy_score(Y_test, clf.predict(X_test)))
+    print('F1 CLF: ', f1_score(Y_test, clf.predict(X_test)))
 
     pred = clf.predict(X_test)
     false_classified = X_test[pred != Y_test]
 
     if quantitative:
         explainer = DefaultExplainer(clf, X_train, chosen_features, features_names=names, testset=X_test, testlabels=Y_test)
-        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names)
+        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=0.6)
         i = 0
         for instance in false_classified[6:]:
             print('Instance ', i )
@@ -119,8 +123,8 @@ def run_ids(_log,
             ex_ids.log_scalar('lime_accuracy_instance', viz.lime_score_instance)
             ex_ids.log_scalar('lime_accuracy_db', viz.lime_score_db)
             ex_ids.log_scalar('tree_global', viz.tree_score_global)
-            ex_ids.log_scalar('confidence', viz.confidence)
-            ex_ids.log_scalar('probability attack', (-1)*np.log(viz.prediction_proba[0,0]) - np.log(viz.prediction_proba[0,1]))
+            # ex_ids.log_scalar('confidence', viz.confidence)
+            # ex_ids.log_scalar('probability attack', (-1)*np.log(viz.prediction_proba[0,0]) - np.log(viz.prediction_proba[0,1]))
             ex_ids.log_scalar('feature recall', viz.feature_recall_count)
             i += 1
 
@@ -133,7 +137,7 @@ def run_ids(_log,
                 break
 
 
-        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=0.3)
+        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=0.6)
 
 
         viz.present_explanation(method='relative')
@@ -151,8 +155,8 @@ def kdd_conf():
     random_state = 1001
     chosen_features = None
     mlp_dump_file = "exports/mlp_kdd.joblib"
-    classifier = "mlp"
-    quantitative = False
+    classifier = "rf"
+    quantitative = True
 
 
 @ex_kdd.main
@@ -180,13 +184,15 @@ def run_kdd(_log,
             joblib.dump(clf, mlp_dump_file)
     elif classifier == "rf":
         _log.info('using random forest')
-        clf = RandomForestClassifier(n_jobs=100, n_estimators=100, random_state=random_state)
+        # clf = RandomForestClassifier(n_jobs=100, n_estimators=100, random_state=random_state)
+        clf = SGDClassifier(loss='log', alpha=0.1)
         clf.fit(X, Y)
 
 
     Xtest, Ytest, names = load_kdd_csv(normalize=normalize, train=False)
-    _log.info('accuracy CLF: ' + str(accuracy_score(clf.predict(Xtest), Ytest)))
-    print('accuracy CLF: ', accuracy_score(clf.predict(Xtest), Ytest))
+    _log.info('accuracy CLF: ' + str(accuracy_score(Ytest, clf.predict(Xtest))))
+    print('accuracy CLF: ', accuracy_score(Ytest, clf.predict(Xtest)))
+    print('f1 CLF: ', f1_score(Ytest, clf.predict(Xtest)))
 
 
     pred = clf.predict(Xtest)
@@ -209,7 +215,7 @@ def run_kdd(_log,
                 explainer.explain_instance(instance)
                 break
 
-        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=0.6)
+        viz = ExplanationVisualizer(explainer, chosen_features, feature_names=names, max_distance=1.0)
         viz.present_explanation(method='relative')
         # viz.present_explanation(method='visual')
 

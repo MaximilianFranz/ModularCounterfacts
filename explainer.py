@@ -56,7 +56,6 @@ class DefaultExplainer(Explainer):
         self.bd = BoundaryFinder(self.clf)
         self.sg = LinearSurrogate(self.clf, self.chosen_features, self.dataset, alpha=0.0001)
 
-
     def explain_instance(self, instance, chosen_features=None, target_label=1):
         """
 
@@ -70,8 +69,8 @@ class DefaultExplainer(Explainer):
 
         self.last_instance = instance
 
-        self.counterfactual = self.cf.improved_nelder_mead(instance, target_value=target_label, step=10)
-        self.support_set = self.sp.support_points_with_magnetic_sampling(instance, self.counterfactual)
+        self.counterfactual = self.cf.random(instance, target_value=target_label)
+        self.support_set = self.sp.support_with_random_sampling(instance, self.counterfactual)
         self.touchpoints = self.bd.touchpoints_using_binary_search(self.support_set, instance, fineness=5)
         self.surrogate = self.sg.train_around_border(self.touchpoints)
 
