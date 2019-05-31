@@ -3,6 +3,7 @@
 """
 from magnetic_sampling import MagneticSampler
 from sklearn.preprocessing import StandardScaler
+from utils import construct_test_data_around_instance
 
 
 class SupportFinder():
@@ -44,3 +45,20 @@ class SupportFinder():
                                               threshold=threshold
                                               )
         return support_points
+
+    def support_with_random_sampling(self, instance, counterfactual, num_support=10):
+
+        max_distance = 0.3
+        while True:
+            sample = construct_test_data_around_instance(self.data, instance, max_distance=max_distance)
+            if len(sample) == 0:
+                max_distance += 0.3
+                continue
+
+            pred = self.clf.predict(sample)
+            sample = sample[pred == 1] # TODO: Change to dynamic
+            if len(sample) > num_support:
+                return sample[0:num_support]
+            else:
+                max_distance += 0.3
+
