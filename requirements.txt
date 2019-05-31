@@ -7,7 +7,7 @@ joblib==0.13.2
 jsonpickle==0.9.6
 kiwisolver==1.0.1
 lime==0.1.1.33
-matplotlib==2.1.0
+matplotlib==3.0.3
 munch==2.3.2
 networkx==2.3
 numpy==1.15.4
