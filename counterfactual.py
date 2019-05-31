@@ -4,6 +4,8 @@ from scipy.optimize import minimize
 from statsmodels import robust
 import gradientgrow as gg
 
+from utils import construct_test_data_around_instance
+
 
 class CounterFactualFinder():
     def __init__(self, clf, data, chosen_attributes=None):
@@ -67,16 +69,42 @@ class CounterFactualFinder():
             # print(str(value) + " " + str(l*manhattan_distance(x)))
             return optimize
 
-        return minimize(func, instance, method="Nelder-Mead", options={'adaptive': True}).x
+        result = minimize(func, instance, method="Nelder-Mead", options={'adaptive': True}).x
+        if np.array_equal(result,instance):
+            return self.random(instance, target_value=target_value)
+        else:
+            return result
 
-    def get_first_adversarial(self, original_instance):
+    def random(self, instance, target_value=1):
+
+        counterfact = None
+        max_distance=0.3
+
+        while not counterfact:
+            print(max_distance)
+            sample = construct_test_data_around_instance(self.data, instance, max_distance=max_distance)
+            if len(sample) == 0:
+                max_distance += 0.3
+                continue
+
+            pred = self.clf.predict(sample)
+            sample = sample[pred == target_value]
+            if len(sample) > 0:
+                counterfact = sample[0]
+                break
+            else:
+                max_distance += 0.3
+
+        return counterfact
+
+    def get_first_adversarial(self, original_instance, features):
         """
         Using the GradientSearch approach this method searches the first adversarial
         instance to feed into magnetic_sampling.
         """
         # GradientSearch returns only the two chosen attributes
         dec = gg.Decision(self.data,
-                          self.chosen_attributes,
+                          features,
                           original_instance,
                           self.clf)
         # TODO: Automate Parameters
