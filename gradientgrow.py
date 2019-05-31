@@ -138,6 +138,7 @@ class Decision:
             """
             current_pred = np.round(last_prediction, decimals=3)
             factor = 1
+            chosen = None
             while ((last_prediction >= current_pred) & (current_pred <= 0.5)):
                 # While current prediction is worse than last_pred
                 factor = factor + scale
@@ -204,6 +205,8 @@ class Decision:
             if choice[3] <= last_prediction:
                 # If no better choice found, use search_far
                 choice = self.search_far(count, last_prediction=last_prediction, scale=scale)
+                if choice is None:
+                    choice = self.choose_one_candidate(possible_candidates)
 
             count += 1
             choice[0] = count
